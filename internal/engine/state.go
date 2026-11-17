@@ -132,9 +132,32 @@ func canonical(p string) string {
 	return filepath.ToSlash(abs)
 }
 
+// repoKey names the collection repository.
+// The email id is already SHA-256 hex, so its first 16 characters are the short hash.
+// The project path is hashed on its own. A fallback id that is not a SHA-256 hex is hashed first.
 func repoKey(userID, project string) string {
-	sum := sha256.Sum256([]byte(userID + "\x00" + project))
-	return hex.EncodeToString(sum[:])
+	return sha16ID(userID) + "_" + sha16(project)
+}
+
+func sha16(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
+func sha16ID(id string) string {
+	if len(id) == 64 && isHex(id) {
+		return id[:16]
+	}
+	return sha16(id)
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return s != ""
 }
 
 func loadConfig(dataDir string) Config {

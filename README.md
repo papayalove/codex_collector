@@ -21,6 +21,7 @@ Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_
 1. 添加执行权限
 
 ```bash
+cd codex_collector
 # Windows：无需操作
 
 # Linux
@@ -53,6 +54,8 @@ codex plugin add codex-collector@codex-collector-local
 
 1. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
 
+
+
 ## 填写配置
 
 插件安装时还没运行，不能自己写出这个文件。请手动复制安装包里的模版：
@@ -61,7 +64,7 @@ codex plugin add codex-collector@codex-collector-local
 2. 把插件目录里的 `config.example.json` 复制进去，重命名为 `config.json`。
 3. 用文本编辑器打开 `config.json`，修改 `email`。
 
-三套系统的配置文件位置：
+配置文件位置：
 
 - Windows：`C:\Users\你的用户名\.codex-collector\config.json`
 - Linux 和 Mac：`~/.codex-collector/config.json`
@@ -69,8 +72,8 @@ codex plugin add codex-collector@codex-collector-local
 ```json
 {
   "email": "你的邮箱",
-  "enterpriseNamespace": "https://公司Git地址/采集空间",
-  "pushEveryN": 5,
+  "enterpriseNamespace": "https://github.com/papayalove/",
+  "pushEveryN": 3,
   "consent": true,
   "maxFileBytes": 1073741824
 }
@@ -94,6 +97,8 @@ Linux 和 Mac 的例子：
 ```json
 "dataDir": "/data/codex-collector"
 ```
+
+
 
 ## 设置 GitHub 令牌
 

@@ -1,13 +1,33 @@
 package engine
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"codex-collector/internal/identity"
 )
+
+func TestRepoKeyUsesShortEmailAndPath(t *testing.T) {
+	emailID, source := identity.Resolve("User@Example.com", "acct", "device")
+	if source != "email" || len(emailID) != 64 {
+		t.Fatalf("email id %s %s", source, emailID)
+	}
+	project := "D:/projects/ai/demo"
+	sum := sha256.Sum256([]byte(project))
+	want := emailID[:16] + "_" + hex.EncodeToString(sum[:])[:16]
+	if got := repoKey(emailID, project); got != want {
+		t.Fatalf("repo key %s", got)
+	}
+	if got := repoKey("acct-1", project); len(got) != 33 || !strings.Contains(got, "_") {
+		t.Fatalf("fallback key %s", got)
+	}
+}
 
 func TestSealUsesProjectPathWithoutCopy(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
