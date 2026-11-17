@@ -18,7 +18,7 @@
 
 Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
 
-1. 添加执行权限
+2. 添加执行权限
 
 ```bash
 cd codex_collector
@@ -36,7 +36,7 @@ cp bin/collector-darwin-amd64 bin/collector
 chmod +x bin/collector
 ```
 
-1. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
+3. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
 
 Windows：
 
@@ -52,7 +52,7 @@ codex plugin marketplace add ~/tools/codex_collector
 codex plugin add codex-collector@codex-collector-local
 ```
 
-1. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
+4. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
 
 
 
