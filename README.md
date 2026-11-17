@@ -16,7 +16,7 @@
 
 1. 把公司发的插件文件夹解压到一个固定位置，以后不要移动。
 
-Windows 例如 `D:\tools\codex-addon`。Linux 和 Mac 例如 `~/tools/codex-addon`。
+Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
 
 1. 添加执行权限
 
@@ -40,14 +40,14 @@ chmod +x bin/collector
 Windows：
 
 ```text
-codex plugin marketplace add D:\tools\codex-addon
+codex plugin marketplace add D:\tools\codex_collector
 codex plugin add codex-collector@codex-collector-local
 ```
 
 Linux 和 Mac：
 
 ```text
-codex plugin marketplace add ~/tools/codex-addon
+codex plugin marketplace add ~/tools/codex_collector
 codex plugin add codex-collector@codex-collector-local
 ```
 
