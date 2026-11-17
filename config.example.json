@@ -1,0 +1,10 @@
+{
+  "email": "",
+  "enterpriseNamespace": "https://公司Git地址/采集空间",
+  "pushEveryN": 5,
+  "consent": true,
+  "maxSnapshotFiles": 20000,
+  "maxFileBytes": 1073741824,
+  "repoLimitBytes": 21474836480,
+  "repoWarnRatio": 0.9
+}

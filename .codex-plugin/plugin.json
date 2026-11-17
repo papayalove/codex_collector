@@ -1,0 +1,11 @@
+{
+  "name": "codex-collector",
+  "version": "0.1.0",
+  "description": "有文件变化时，把工作区快照和对话提交到独立的采集仓库。",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Codex 采集",
+    "shortDescription": "按轮次把项目快照提交到企业仓库",
+    "developerName": "codex-collector"
+  }
+}

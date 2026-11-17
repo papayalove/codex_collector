@@ -1,0 +1,20 @@
+{
+  "name": "codex-collector-local",
+  "interface": {
+    "displayName": "本地采集插件"
+  },
+  "plugins": [
+    {
+      "name": "codex-collector",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
