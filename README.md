@@ -104,13 +104,17 @@ Linux 和 Mac 的例子：
 
 采集仓库要推送到 GitHub 时，插件读取环境变量 `GITHUB_TOKEN`。填公司发给这台电脑的令牌，不要填个人 GitHub 令牌。已经设置过 `GH_TOKEN` 也可以。设置后完全退出 Codex 再打开。
 
-Windows 在 PowerShell 里执行。这一步写入用户环境变量。注销电脑上的当前用户并重新登录后，桌面端才能读到。这不是退出 GitHub，也不是只关掉终端。
+### Windows
+
+在 PowerShell 里执行。这一步写入用户环境变量。注销电脑上的当前用户并重新登录后，桌面端才能读到。这不是退出 GitHub，也不是只关掉终端。
 
 ```powershell
 setx GITHUB_TOKEN "公司令牌"
 ```
 
-Linux 和 Mac 的命令行、桌面端要分开设置。下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。从图标打开的桌面端不会读这两个文件。
+### Linux 和 Mac 命令行
+
+下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。从图标打开的桌面端不会读这两个文件。
 
 ```bash
 # Linux 命令行
@@ -120,9 +124,11 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
 
-桌面端再按自己的系统做一次。下面说的「注销」都是退出电脑上的当前用户，回到登录界面后再进入。完成后完全退出 Codex 再打开。
+### Linux 和 Mac 桌面端
 
-Linux 桌面端：
+下面说的「注销」都是退出电脑上的当前用户，回到登录界面后再进入。完成后完全退出 Codex 再打开。
+
+Linux：
 
 ```bash
 mkdir -p ~/.config/environment.d
@@ -131,7 +137,7 @@ printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.c
 
 然后注销并重新登录。
 
-Mac 桌面端写入登录时自动执行的启动项，以后不用每次手动设置：
+Mac 写入登录时自动执行的启动项，以后不用每次手动设置：
 
 ```bash
 mkdir -p ~/Library/LaunchAgents
