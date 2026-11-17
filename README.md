@@ -104,23 +104,62 @@ Linux 和 Mac 的例子：
 
 采集仓库要推送到 GitHub 时，插件读取环境变量 `GITHUB_TOKEN`。填公司发给这台电脑的令牌，不要填个人 GitHub 令牌。已经设置过 `GH_TOKEN` 也可以。设置后完全退出 Codex 再打开。
 
-Windows 在 PowerShell 里执行。这一步写入用户环境变量，重新登录一次后，桌面端才能读到。
+Windows 在 PowerShell 里执行。这一步写入用户环境变量。注销电脑上的当前用户并重新登录后，桌面端才能读到。这不是退出 GitHub，也不是只关掉终端。
 
 ```powershell
 setx GITHUB_TOKEN "公司令牌"
 ```
 
-Linux 和 Mac 在终端执行。命令行新开一个终端后生效。
+Linux 和 Mac 的命令行、桌面端要分开设置。下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。从图标打开的桌面端不会读这两个文件。
 
 ```bash
-# Linux
+# Linux 命令行
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 
-# Mac
+# Mac 命令行
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
 
-这两行只对命令行生效。桌面端请重新登录一次；Mac 也可以在终端执行 `launchctl setenv GITHUB_TOKEN "公司令牌"`，然后重新打开 Codex。
+桌面端再按自己的系统做一次。下面说的「注销」都是退出电脑上的当前用户，回到登录界面后再进入。完成后完全退出 Codex 再打开。
+
+Linux 桌面端：
+
+```bash
+mkdir -p ~/.config/environment.d
+printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.conf
+```
+
+然后注销并重新登录。
+
+Mac 桌面端写入登录时自动执行的启动项，以后不用每次手动设置：
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.codex-collector.github-token.plist <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.codex-collector.github-token</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/launchctl</string>
+    <string>setenv</string>
+    <string>GITHUB_TOKEN</string>
+    <string>公司令牌</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-collector.github-token.plist
+```
+
+然后完全退出 Codex 再打开。注销或重启电脑之后，桌面端仍会自动带上这个令牌。
+
+这些文件里有令牌，不要提交到仓库。更换令牌时改对应文件，再注销并重新登录。
 
 ## 允许钩子运行
 
