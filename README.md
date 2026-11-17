@@ -97,25 +97,25 @@ Linux 和 Mac 的例子：
 
 ## 设置 GitHub 令牌
 
-采集仓库要推送到 GitHub 时，插件读取环境变量 `GITHUB_TOKEN`。已经设置过 `GH_TOKEN` 也可以。设置后完全退出 Codex 再打开。
+采集仓库要推送到 GitHub 时，插件读取环境变量 `GITHUB_TOKEN`。填公司发给这台电脑的令牌，不要填个人 GitHub 令牌。已经设置过 `GH_TOKEN` 也可以。设置后完全退出 Codex 再打开。
 
 Windows 在 PowerShell 里执行。这一步写入用户环境变量，重新登录一次后，桌面端才能读到。
 
 ```powershell
-setx GITHUB_TOKEN "你的令牌"
+setx GITHUB_TOKEN "公司令牌"
 ```
 
 Linux 和 Mac 在终端执行。命令行新开一个终端后生效。
 
 ```bash
 # Linux
-echo 'export GITHUB_TOKEN="你的令牌"' >> ~/.bashrc
+echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 
 # Mac
-echo 'export GITHUB_TOKEN="你的令牌"' >> ~/.zshrc
+echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
 
-这两行只对命令行生效。桌面端请重新登录一次；Mac 也可以在终端执行 `launchctl setenv GITHUB_TOKEN "你的令牌"`，然后重新打开 Codex。
+这两行只对命令行生效。桌面端请重新登录一次；Mac 也可以在终端执行 `launchctl setenv GITHUB_TOKEN "公司令牌"`，然后重新打开 Codex。
 
 ## 允许钩子运行
 
