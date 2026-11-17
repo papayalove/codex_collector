@@ -18,10 +18,9 @@
 
 Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
 
-2. 添加执行权限
+1. 添加执行权限
 
 ```bash
-cd codex_collector
 # Windows：无需操作
 
 # Linux
@@ -36,7 +35,7 @@ cp bin/collector-darwin-amd64 bin/collector
 chmod +x bin/collector
 ```
 
-3. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
+1. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
 
 Windows：
 
@@ -52,9 +51,7 @@ codex plugin marketplace add ~/tools/codex_collector
 codex plugin add codex-collector@codex-collector-local
 ```
 
-4. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
-
-
+1. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
 
 ## 填写配置
 
@@ -64,7 +61,7 @@ codex plugin add codex-collector@codex-collector-local
 2. 把插件目录里的 `config.example.json` 复制进去，重命名为 `config.json`。
 3. 用文本编辑器打开 `config.json`，修改 `email`。
 
-配置文件位置：
+三套系统的配置文件位置：
 
 - Windows：`C:\Users\你的用户名\.codex-collector\config.json`
 - Linux 和 Mac：`~/.codex-collector/config.json`
@@ -72,8 +69,8 @@ codex plugin add codex-collector@codex-collector-local
 ```json
 {
   "email": "你的邮箱",
-  "enterpriseNamespace": "https://github.com/papayalove/",
-  "pushEveryN": 3,
+  "enterpriseNamespace": "https://公司Git地址/采集空间",
+  "pushEveryN": 5,
   "consent": true,
   "maxFileBytes": 1073741824
 }
@@ -86,7 +83,7 @@ codex plugin add codex-collector@codex-collector-local
 - Windows：`C:\Users\你的用户名\.codex-collector\repos`
 - Linux 和 Mac：`~/.codex-collector/repos`
 
-Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。Linux 和 Mac 空间不够时同样增加这一项，必须写绝对路径。配置文件仍留在上面的默认目录，已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开，之后的采集才会写到新目录。
+Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
 
 ```json
 "dataDir": "D:/codex-collector"
@@ -98,15 +95,11 @@ Linux 和 Mac 的例子：
 "dataDir": "/data/codex-collector"
 ```
 
-
-
 ## 设置 GitHub 令牌
-
-采集仓库要推送到 GitHub 时，插件读取环境变量 `GITHUB_TOKEN`。填公司发给这台电脑的令牌，不要填个人 GitHub 令牌。已经设置过 `GH_TOKEN` 也可以。设置后完全退出 Codex 再打开。
 
 ### Windows
 
-在 PowerShell 里执行。这一步写入用户环境变量。注销电脑上的当前用户并重新登录后，桌面端才能读到。这不是退出 GitHub，也不是只关掉终端。
+在 PowerShell 里执行。
 
 ```powershell
 setx GITHUB_TOKEN "公司令牌"
@@ -114,7 +107,7 @@ setx GITHUB_TOKEN "公司令牌"
 
 ### Linux 和 Mac 命令行
 
-下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。从图标打开的桌面端不会读这两个文件。
+下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。
 
 ```bash
 # Linux 命令行
@@ -126,7 +119,7 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 
 ### Linux 和 Mac 桌面端
 
-下面说的「注销」都是退出电脑上的当前用户，回到登录界面后再进入。完成后完全退出 Codex 再打开。
+完成后完全退出 Codex 再打开。
 
 Linux：
 
@@ -135,7 +128,7 @@ mkdir -p ~/.config/environment.d
 printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.conf
 ```
 
-然后注销并重新登录。
+然后注销当前电脑用户并重新登录。
 
 Mac 写入登录时自动执行的启动项，以后不用每次手动设置：
 
@@ -165,8 +158,6 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-collector.gith
 
 然后完全退出 Codex 再打开。注销或重启电脑之后，桌面端仍会自动带上这个令牌。
 
-这些文件里有令牌，不要提交到仓库。更换令牌时改对应文件，再注销并重新登录。
-
 ## 允许钩子运行
 
 桌面端和命令行都要允许钩子，但提示不一样。这个确认只在第一次，或插件更新之后出现。
@@ -190,5 +181,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-collector.gith
 ## 使用时会看到什么
 
 一轮回答结束后，界面可能短暂显示「记录本轮文件变化」。这是插件在查看哪些文件变了。没有改文件时，很快就会结束。改了文件时，会先把这一刻的文件固定下来，提交和推送在后台继续，不挡住你的下一句。
+
+命令行里，每次提交或推送结束后会打一行结果，例如 `codex-collector: 提交成功`、`codex-collector: 推送失败`。桌面端不显示。
 
 模型、数据集和压缩包不会送进仓库，只在清单里记录路径。密钥文件也不会送进仓库。
