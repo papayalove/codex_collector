@@ -76,24 +76,24 @@ codex plugin add codex-collector@codex-collector-local
 }
 ```
 
-`maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。
-
-采集仓库默认在配置文件旁边的 `repos` 目录里：
-
-- Windows：`C:\Users\你的用户名\.codex-collector\repos`
-- Linux 和 Mac：`~/.codex-collector/repos`
-
-Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
-
-```json
-"dataDir": "D:/codex-collector"
-```
-
-Linux 和 Mac 的例子：
-
-```json
-"dataDir": "/data/codex-collector"
-```
+> <sub><sup>`maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。</sup></sub>
+>
+> <sub><sup>采集仓库默认在配置文件旁边的 `repos` 目录里：</sup></sub>
+>
+> - <sub><sup>Windows：`C:\Users\你的用户名\.codex-collector\repos`</sup></sub>
+> - <sub><sup>Linux 和 Mac：`~/.codex-collector/repos`</sup></sub>
+>
+> <sub><sup>Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。</sup></sub>
+>
+> ```json
+> "dataDir": "D:/codex-collector"
+> ```
+>
+> <sub><sup>Linux 和 Mac 的例子：</sup></sub>
+>
+> ```json
+> "dataDir": "/data/codex-collector"
+> ```
 
 ## 设置 GitHub 令牌
 
