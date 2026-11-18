@@ -16,42 +16,44 @@
 
 1. 把公司发的插件文件夹解压到一个固定位置，以后不要移动。
 
-Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
+   Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
 
 1. 添加执行权限
 
-```bash
-# Windows：无需操作
+   ```bash
+   # Windows：无需操作
 
-# Linux
-chmod +x bin/collector
+   # Linux
+   chmod +x bin/collector
 
-# Mac（Apple 芯片）：
-cp bin/collector-darwin-arm64 bin/collector
-chmod +x bin/collector
+   # Mac（Apple 芯片）：
+   cp bin/collector-darwin-arm64 bin/collector
+   chmod +x bin/collector
 
-# Mac（Intel）：
-cp bin/collector-darwin-amd64 bin/collector
-chmod +x bin/collector
-```
+   # Mac（Intel）：
+   cp bin/collector-darwin-amd64 bin/collector
+   chmod +x bin/collector
+   ```
 
 1. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
 
-Windows：
+   Windows：
 
-```text
-codex plugin marketplace add D:\tools\codex_collector
-codex plugin add codex-collector@codex-collector-local
-```
+   ```text
+   codex plugin marketplace add D:\tools\codex_collector
+   codex plugin add codex-collector@codex-collector-local
+   ```
 
-Linux 和 Mac：
+   Linux 和 Mac：
 
-```text
-codex plugin marketplace add ~/tools/codex_collector
-codex plugin add codex-collector@codex-collector-local
-```
+   ```text
+   codex plugin marketplace add ~/tools/codex_collector
+   codex plugin add codex-collector@codex-collector-local
+   ```
 
 1. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
+
+
 
 ## 填写配置
 
@@ -76,22 +78,26 @@ codex plugin add codex-collector@codex-collector-local
 }
 ```
 
-> <sub><sup>`maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。</sup></sub>
+> `maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。
 >
-> <sub><sup>采集仓库默认在配置文件旁边的 `repos` 目录里：</sup></sub>
+> 采集仓库默认在配置文件旁边的 `repos` 目录里：
 >
-> - <sub><sup>Windows：`C:\Users\你的用户名\.codex-collector\repos`</sup></sub>
-> - <sub><sup>Linux 和 Mac：`~/.codex-collector/repos`</sup></sub>
+> - Windows：`C:\Users\你的用户名\.codex-collector\repos`
+> - Linux 和 Mac：`~/.codex-collector/repos`
 >
-> <sub><sup>Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。</sup></sub>
+> Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
 >
-> <sub><sup>"dataDir": "D:/codex-collector"</sup></sub>
+> "dataDir": "D:/codex-collector"
 >
-> <sub><sup>Linux 和 Mac 的例子：</sup></sub>
+> Linux 和 Mac 的例子：
 >
-> <sub><sup>"dataDir": "/data/codex-collector"</sup></sub>
+> "dataDir": "/data/codex-collector"
+
+
 
 ## 设置 GitHub 令牌
+
+
 
 ### Windows
 
@@ -100,6 +106,8 @@ codex plugin add codex-collector@codex-collector-local
 ```powershell
 setx GITHUB_TOKEN "公司令牌"
 ```
+
+
 
 ### Linux 和 Mac 命令行
 
@@ -112,6 +120,8 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 # Mac 命令行
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
+
+
 
 ### Linux 和 Mac 桌面端
 
