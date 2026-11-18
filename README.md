@@ -37,16 +37,14 @@
 
 1. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
 
-   Windows：
-
    ```bash
+   # Windows:
    codex plugin marketplace add D:\tools\codex_collector
    codex plugin add codex-collector@codex-collector-local
    ```
 
-   Linux 和 Mac：
-
    ```bash
+   # Linux 和 Mac：
    codex plugin marketplace add ~/tools/codex_collector
    codex plugin add codex-collector@codex-collector-local
    ```
