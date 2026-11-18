@@ -15,12 +15,10 @@
 ## 安装
 
 1. 把公司发的插件文件夹解压到一个固定位置，以后不要移动。
-
-   Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
-
-1. 添加执行权限
-
-   ```bash
+  Windows 例如 `D:\tools\codex_collector`。Linux 和 Mac 例如 `~/tools/codex_collector`。
+2. 添加执行权限
+  ```bash
+   cd ./codex_collector
    # Windows：无需操作
 
    # Linux
@@ -33,18 +31,14 @@
    # Mac（Intel）：
    cp bin/collector-darwin-amd64 bin/collector
    chmod +x bin/collector
-   ```
-
-1. 在解压出来的插件目录里打开终端，执行：
-
-   ```bash
-   codex plugin marketplace add .
-   codex plugin add codex-collector@codex-collector-local
-   ```
-
-1. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
-
-
+  ```
+3. 在解压出来的插件目录里打开终端，执行：
+  ```bash
+  cd ./codex_collector
+  codex plugin marketplace add .
+  codex plugin add codex-collector@codex-collector-local
+  ```
+4. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
 
 ## 填写配置
 
@@ -63,32 +57,32 @@
 {
   "email": "你的邮箱",
   "enterpriseNamespace": "https://公司Git地址/采集空间",
-  "pushEveryN": 5,
+  "pushEveryN": 2,
   "consent": true,
   "maxFileBytes": 1073741824
 }
 ```
 
-> `maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。
->
-> 采集仓库默认在配置文件旁边的 `repos` 目录里：
->
-> - Windows：`C:\Users\你的用户名\.codex-collector\repos`
-> - Linux 和 Mac：`~/.codex-collector/repos`
->
-> Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
->
-> "dataDir": "D:/codex-collector"
->
-> Linux 和 Mac 的例子：
->
-> "dataDir": "/data/codex-collector"
+`maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。
 
+采集仓库默认在配置文件旁边的 `repos` 目录里：
 
+- Windows：`C:\Users\你的用户名\.codex-collector\repos`
+- Linux 和 Mac：`~/.codex-collector/repos`
+
+Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
+
+```json
+"dataDir": "D:/codex-collector"
+```
+
+Linux 和 Mac 的例子：
+
+```json
+"dataDir": "/data/codex-collector"
+```
 
 ## 设置 GitHub 令牌
-
-
 
 ### Windows
 
@@ -97,8 +91,6 @@
 ```powershell
 setx GITHUB_TOKEN "公司令牌"
 ```
-
-
 
 ### Linux 和 Mac 命令行
 
@@ -112,8 +104,6 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
 
-
-
 ### Linux 和 Mac 桌面端
 
 完成后完全退出 Codex 再打开。
@@ -121,6 +111,7 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 Linux：
 
 ```bash
+# 替换下方的公司令牌
 mkdir -p ~/.config/environment.d
 printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.conf
 ```
@@ -130,6 +121,7 @@ printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.c
 Mac 写入登录时自动执行的启动项，以后不用每次手动设置：
 
 ```bash
+# 替换下方的公司令牌
 mkdir -p ~/Library/LaunchAgents
 cat > ~/Library/LaunchAgents/com.codex-collector.github-token.plist <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -178,7 +170,5 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-collector.gith
 ## 使用时会看到什么
 
 一轮回答结束后，界面可能短暂显示「记录本轮文件变化」。这是插件在查看哪些文件变了。没有改文件时，很快就会结束。改了文件时，会先把这一刻的文件固定下来，提交和推送在后台继续，不挡住你的下一句。
-
-命令行里，每次提交或推送结束后会打一行结果，例如 `codex-collector: 提交成功`、`codex-collector: 推送失败`。桌面端不显示。
 
 模型、数据集和压缩包不会送进仓库，只在清单里记录路径。密钥文件也不会送进仓库。
