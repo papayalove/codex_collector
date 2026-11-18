@@ -35,17 +35,10 @@
    chmod +x bin/collector
    ```
 
-1. 打开终端，执行下面两条命令。把路径换成你实际的解压位置。
+1. 在解压出来的插件目录里打开终端，执行：
 
    ```bash
-   # Windows:
-   codex plugin marketplace add D:\tools\codex_collector
-   codex plugin add codex-collector@codex-collector-local
-   ```
-
-   ```bash
-   # Linux 和 Mac：
-   codex plugin marketplace add ~/tools/codex_collector
+   codex plugin marketplace add .
    codex plugin add codex-collector@codex-collector-local
    ```
 
