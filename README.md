@@ -85,15 +85,11 @@ codex plugin add codex-collector@codex-collector-local
 >
 > <sub><sup>Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。</sup></sub>
 >
-> ```json
-> "dataDir": "D:/codex-collector"
-> ```
+> <sub><sup>"dataDir": "D:/codex-collector"</sup></sub>
 >
 > <sub><sup>Linux 和 Mac 的例子：</sup></sub>
 >
-> ```json
-> "dataDir": "/data/codex-collector"
-> ```
+> <sub><sup>"dataDir": "/data/codex-collector"</sup></sub>
 
 ## 设置 GitHub 令牌
 
