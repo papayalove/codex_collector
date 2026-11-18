@@ -39,14 +39,14 @@
 
    Windows：
 
-   ```text
+   ```bash
    codex plugin marketplace add D:\tools\codex_collector
    codex plugin add codex-collector@codex-collector-local
    ```
 
    Linux 和 Mac：
 
-   ```text
+   ```bash
    codex plugin marketplace add ~/tools/codex_collector
    codex plugin add codex-collector@codex-collector-local
    ```
