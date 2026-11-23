@@ -8,5 +8,5 @@ import (
 )
 
 func ignoreDaemonSignals() {
-	signal.Ignore(syscall.SIGHUP)
+	signal.Ignore(syscall.SIGHUP, syscall.SIGPIPE)
 }

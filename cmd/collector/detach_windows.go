@@ -12,4 +12,7 @@ func detach(cmd *exec.Cmd) {
 		CreationFlags: 0x08000000,
 		HideWindow:    true,
 	}
+	if con := consoleWriter(); con != nil {
+		cmd.Stderr = con
+	}
 }

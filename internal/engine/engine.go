@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,9 +24,11 @@ type Engine struct {
 	Now       func() time.Time
 	Home      string
 	AfterPush func()
+	Log       io.Writer
 
 	mu    sync.Mutex
 	locks map[string]*sync.Mutex
+	logMu sync.Mutex
 }
 
 func (e *Engine) configDir() string {
@@ -138,9 +142,78 @@ func (e *Engine) onStart(ev hookEvent, cfg Config) Result {
 	st.UserIDSource = source
 	_ = st.save(e.statePath(key))
 	if cfg.EnterpriseNamespace != "" {
-		go e.ensureRemoteLater(cfg, gitDir, key)
+		go e.startRemote(cfg, gitDir, key)
 	}
+	e.record(key, ev.SessionID, "", reasonStart, source)
 	return Result{Action: "ready", Detail: source}
+}
+
+// startRemote prepares the empty remote, then retries one push that already
+// failed or already reached the batch size. Session start is the chance to
+// send it: the idle commit loop does not look at unpushed commits once the
+// queue is empty.
+func (e *Engine) startRemote(cfg Config, gitDir, key string) {
+	e.ensureRemoteLater(cfg, gitDir, key)
+	e.retryPendingPush(cfg, gitDir, key)
+}
+
+func (e *Engine) retryPendingPush(cfg Config, gitDir, key string) {
+	cfg = cfg.normalized()
+	if cfg.EnterpriseNamespace == "" {
+		return
+	}
+	lk := e.lock(key)
+	lk.Lock()
+	st := loadState(e.statePath(key))
+	branch, count := pendingPush(st, cfg.PushEveryN)
+	if branch == "" || st.Pushing || st.Paused {
+		lk.Unlock()
+		return
+	}
+	lk.Unlock()
+
+	if err := e.ensureEnterpriseRepo(cfg, gitDir, key); err != nil {
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportPush("", err)
+		return
+	}
+
+	lk.Lock()
+	st = loadState(e.statePath(key))
+	branch, count = pendingPush(st, cfg.PushEveryN)
+	if branch == "" || st.Pushing || st.Paused {
+		lk.Unlock()
+		return
+	}
+	st.Pushing = true
+	_ = st.save(e.statePath(key))
+	lk.Unlock()
+	e.push(key, gitDir, branch, count)
+}
+
+// pendingPush is a branch that should be sent without waiting for another commit.
+// A failed push is retried even during its backoff. A full batch that never
+// started is sent as well. A short batch that has not failed stays local.
+func pendingPush(st repoState, every int) (string, int) {
+	names := make([]string, 0, len(st.Branches))
+	for name := range st.Branches {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	failedName, failedCount := "", 0
+	for _, name := range names {
+		br := st.Branches[name]
+		if br.Unpushed <= 0 || br.Commit == "" {
+			continue
+		}
+		if every > 0 && br.Unpushed >= every {
+			return name, br.Unpushed
+		}
+		if st.PushFails > 0 && failedName == "" {
+			failedName, failedCount = name, br.Unpushed
+		}
+	}
+	return failedName, failedCount
 }
 
 func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
@@ -219,6 +292,7 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	st.Files = files
 	st.TranscriptLen = tlen
 	_ = st.save(e.statePath(key))
+	e.record(key, ev.SessionID, turn, reasonQueued, branch)
 	return Result{Action: "sealed", Detail: branch}
 }
 
@@ -514,11 +588,13 @@ func (e *Engine) commitRepo(key string, cfg Config) {
 		sha, err := e.Git.commitTree(gitDir, tree, parent, "collect "+job.Branch+" "+strings.Join(job.TurnIDs, ","))
 		if err != nil {
 			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+			e.reportCommit(job.Branch, "", err)
 			kept = append(kept, job)
 			continue
 		}
 		if _, err := e.Git.run(gitDir, nil, "update-ref", "refs/heads/"+job.Branch, sha); err != nil {
 			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+			e.reportCommit(job.Branch, "", err)
 			kept = append(kept, job)
 			continue
 		}
@@ -528,6 +604,8 @@ func (e *Engine) commitRepo(key string, cfg Config) {
 		br.Unpushed++
 		st.Branches[job.Branch] = br
 		lastOK = job.Branch
+		e.reportCommit(job.Branch, sha, nil)
+		e.record(key, job.SessionID, strings.Join(job.TurnIDs, ","), reasonCommit, fmt.Sprintf("%s %s 待推送 %d", job.Branch, shortSHA(sha), br.Unpushed))
 	}
 	warnBranch := ""
 	if warnNow && lastOK != "" {
@@ -577,36 +655,44 @@ func (e *Engine) writeWarnFile(key, gitDir string, st *repoState, prefer string,
 	tree, err := e.Git.revParse(gitDir, parent+"^{tree}")
 	if err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportCommit(branch, "", err)
 		return ""
 	}
 	newTree, err := e.Git.treeWithFile(gitDir, tree, filepath.Join(e.DataDir, "index", key+"-warn"), warnFileName, warnFileBody(size, limit))
 	if err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportCommit(branch, "", err)
 		return ""
 	}
 	newTree = e.treeWithRecords(gitDir, key, newTree)
 	sha, err := e.Git.commitTree(gitDir, newTree, parent, "容量达到上限的 90%")
 	if err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportCommit(branch, "", err)
 		return ""
 	}
 	if _, err := e.Git.run(gitDir, nil, "update-ref", "refs/heads/"+branch, sha); err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportCommit(branch, "", err)
 		return ""
 	}
 	br := st.Branches[branch]
 	br.Commit = sha
 	br.Unpushed++
 	st.Branches[branch] = br
+	e.reportCommit(branch, sha, nil)
+	e.record(key, "", "", reasonCommit, fmt.Sprintf("%s %s 待推送 %d 容量预警", branch, shortSHA(sha), br.Unpushed))
 	return branch
 }
 
 func (e *Engine) maybePush(key, gitDir string, st *repoState, cfg Config, forceBranch string) {
 	if cfg.EnterpriseNamespace == "" {
+		e.noteNotPushed(key, st, 0, false)
 		return
 	}
 	if err := e.ensureEnterpriseRepo(cfg, gitDir, key); err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		e.reportPush("", err)
 		return
 	}
 	if forceBranch != "" {
@@ -622,6 +708,7 @@ func (e *Engine) maybePush(key, gitDir string, st *repoState, cfg Config, forceB
 			continue
 		}
 		if !st.NextPushAt.IsZero() && e.now().Before(st.NextPushAt) {
+			e.record(key, "", "", reasonHold, fmt.Sprintf("%s 已有 %d 次，%s 后再推", name, br.Unpushed, st.NextPushAt.Format(time.RFC3339)))
 			return
 		}
 		st.Pushing = true
@@ -629,10 +716,33 @@ func (e *Engine) maybePush(key, gitDir string, st *repoState, cfg Config, forceB
 		go e.push(key, gitDir, name, br.Unpushed)
 		return
 	}
+	e.noteNotPushed(key, st, cfg.PushEveryN, true)
+}
+
+func (e *Engine) noteNotPushed(key string, st *repoState, every int, remote bool) {
+	names := make([]string, 0, len(st.Branches))
+	for name, br := range st.Branches {
+		if br.Unpushed > 0 {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		br := st.Branches[name]
+		detail := fmt.Sprintf("%s 已有 %d 次", name, br.Unpushed)
+		if !remote {
+			detail += "，未配置远程仓库"
+		} else if every > 0 {
+			detail += fmt.Sprintf("，满 %d 次再推", every)
+		}
+		e.record(key, "", "", reasonHold, detail)
+	}
 }
 
 func (e *Engine) push(key, gitDir, branch string, count int) {
-	_, err := e.Git.run(gitDir, nil, "push", "origin", branch)
+	remote, _ := e.Git.run(gitDir, []string{"GIT_TERMINAL_PROMPT=0"}, "remote", "get-url", "origin")
+	args := append(gitAuthArgs(remote), "push", "origin", branch)
+	_, err := e.Git.run(gitDir, []string{"GIT_TERMINAL_PROMPT=0"}, args...)
 	lk := e.lock(key)
 	lk.Lock()
 	st := loadState(e.statePath(key))
@@ -640,7 +750,7 @@ func (e *Engine) push(key, gitDir, branch string, count int) {
 	if err != nil {
 		st.PushFails++
 		st.NextPushAt = e.now().Add(backoff(st.PushFails))
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: "push 失败"})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: "push 失败: " + err.Error()})
 	} else {
 		br := st.Branches[branch]
 		if br.Unpushed >= count {
@@ -651,12 +761,29 @@ func (e *Engine) push(key, gitDir, branch string, count int) {
 		st.Branches[branch] = br
 		st.PushFails = 0
 		st.NextPushAt = time.Time{}
+		detail := fmt.Sprintf("%s %d 个提交", branch, count)
+		if remote = strings.TrimSpace(remote); remote != "" {
+			detail += " " + remote
+		}
+		e.record(key, "", "", reasonPush, detail)
 	}
 	_ = st.save(e.statePath(key))
 	lk.Unlock()
+	e.reportPush(branch, err)
 	if e.AfterPush != nil {
 		e.AfterPush()
 	}
+}
+
+func (e *Engine) record(key, session, turn, reason, detail string) {
+	appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: session, TurnID: turn, Reason: reason, Detail: detail})
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
 }
 
 func backoff(fails int) time.Duration {

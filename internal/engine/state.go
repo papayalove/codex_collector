@@ -17,6 +17,12 @@ const (
 	reasonSkipped = "超限没打"
 	reasonIdle    = "没触发"
 	reasonWarn    = "容量预警"
+	reasonStart   = "会话开始"
+	reasonQueued  = "已排队"
+	reasonCommit  = "提交成功"
+	reasonPush    = "推送成功"
+	reasonHold    = "暂不推送"
+	reasonRemote  = "远程就绪"
 
 	defaultPushEveryN   = 10
 	defaultMaxFiles     = 20000
@@ -211,6 +217,7 @@ func appendRecord(dataDir string, rec Record) {
 	if rec.Time == "" {
 		rec.Time = time.Now().Format(time.RFC3339)
 	}
+	rec.Detail = recordDetail(rec.Detail)
 	var path string
 	if rec.RepoKey != "" {
 		dir := filepath.Join(dataDir, "repos", rec.RepoKey)
@@ -272,7 +279,9 @@ func (e *Engine) ensureRemoteLater(cfg Config, gitDir, key string) {
 	defer lk.Unlock()
 	if err := e.ensureOrigin(gitDir, url); err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		return
 	}
+	e.record(key, "", "", reasonRemote, url)
 }
 
 func (e *Engine) ensureOrigin(gitDir, url string) error {

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -8,7 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"codex-collector/internal/identity"
 )
@@ -390,6 +393,113 @@ func readRecords(t *testing.T, data string) string {
 	return b.String()
 }
 
+func TestPendingPushSelection(t *testing.T) {
+	failed := repoState{PushFails: 1, Branches: map[string]branchState{
+		"nogit": {Commit: "abc", Unpushed: 1},
+	}}
+	if name, n := pendingPush(failed, 10); name != "nogit" || n != 1 {
+		t.Fatalf("failed push = %s %d", name, n)
+	}
+	short := failed
+	short.PushFails = 0
+	if name, n := pendingPush(short, 10); name != "" || n != 0 {
+		t.Fatalf("short batch = %s %d", name, n)
+	}
+	full := short
+	full.Branches = map[string]branchState{"nogit": {Commit: "abc", Unpushed: 10}}
+	if name, n := pendingPush(full, 10); name != "nogit" || n != 10 {
+		t.Fatalf("full batch = %s %d", name, n)
+	}
+}
+
+func TestSessionStartRetriesFailedPush(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+	data := t.TempDir()
+	ns := filepath.ToSlash(filepath.Join(t.TempDir(), "missing"))
+	must(t, os.WriteFile(filepath.Join(data, "config.json"), []byte(`{"email":"u42@example.com","consent":true,"pushEveryN":10,"enterpriseNamespace":"`+ns+`"}`), 0o644))
+	var buf lockedBuf
+	eng := &Engine{DataDir: data, Log: &buf}
+	start := eng.Handle([]byte(`{"hook_event_name":"SessionStart","session_id":"sess","cwd":"` + filepath.ToSlash(root) + `"}`))
+	if start.Action != "ready" {
+		t.Fatalf("start: %+v", start)
+	}
+	must(t, os.WriteFile(filepath.Join(root, "hello.py"), []byte("print('hi')\n"), 0o644))
+	if res := eng.Handle(event(root, "turn-1")); res.Action != "sealed" {
+		t.Fatalf("seal: %+v", res)
+	}
+	eng.CommitAll(Config{Consent: true, PushEveryN: 10})
+	gitDir := collectionGit(t, data)
+	key := filepath.Base(filepath.Dir(gitDir))
+	st := loadState(eng.statePath(key))
+	br := st.Branches["nogit"]
+	if br.Commit == "" {
+		t.Fatal("missing commit")
+	}
+	br.Unpushed = 1
+	st.Branches["nogit"] = br
+	st.PushFails = 1
+	st.NextPushAt = time.Now().Add(time.Hour)
+	must(t, st.save(eng.statePath(key)))
+
+	again := eng.Handle([]byte(`{"hook_event_name":"SessionStart","session_id":"sess-2","cwd":"` + filepath.ToSlash(root) + `"}`))
+	if again.Action != "ready" {
+		t.Fatalf("restart: %+v", again)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && !strings.Contains(buf.String(), "推送失败 nogit") {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !strings.Contains(buf.String(), "推送失败 nogit") {
+		t.Fatalf("failed push was not retried: %q", buf.String())
+	}
+	got := loadState(eng.statePath(key))
+	if got.PushFails < 2 {
+		t.Fatalf("pushFails = %d", got.PushFails)
+	}
+	if got.Branches["nogit"].Unpushed != 1 {
+		t.Fatalf("unpushed = %d", got.Branches["nogit"].Unpushed)
+	}
+}
+
+func TestRetrySkipsShortBatch(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+	data := t.TempDir()
+	must(t, os.WriteFile(filepath.Join(data, "config.json"), []byte(`{"email":"u42@example.com","consent":true,"pushEveryN":10}`), 0o644))
+	var buf lockedBuf
+	eng := &Engine{DataDir: data, Log: &buf}
+	if res := eng.Handle([]byte(`{"hook_event_name":"SessionStart","session_id":"sess","cwd":"` + filepath.ToSlash(root) + `"}`)); res.Action != "ready" {
+		t.Fatalf("start: %+v", res)
+	}
+	must(t, os.WriteFile(filepath.Join(root, "hello.py"), []byte("print('hi')\n"), 0o644))
+	if res := eng.Handle(event(root, "turn-1")); res.Action != "sealed" {
+		t.Fatalf("seal: %+v", res)
+	}
+	eng.CommitAll(Config{Consent: true, PushEveryN: 10})
+	gitDir := collectionGit(t, data)
+	key := filepath.Base(filepath.Dir(gitDir))
+	st := loadState(eng.statePath(key))
+	br := st.Branches["nogit"]
+	br.Unpushed = 2
+	st.Branches["nogit"] = br
+	st.PushFails = 0
+	must(t, st.save(eng.statePath(key)))
+
+	ns := filepath.ToSlash(filepath.Join(t.TempDir(), "missing"))
+	eng.retryPendingPush(Config{EnterpriseNamespace: ns, PushEveryN: 10}, gitDir, key)
+	if strings.Contains(buf.String(), "推送") {
+		t.Fatalf("short batch was pushed: %q", buf.String())
+	}
+	if got := loadState(eng.statePath(key)).Branches["nogit"].Unpushed; got != 2 {
+		t.Fatalf("unpushed = %d", got)
+	}
+}
+
 func TestClearStalePush(t *testing.T) {
 	data := t.TempDir()
 	eng := &Engine{DataDir: data}
@@ -403,6 +513,101 @@ func TestClearStalePush(t *testing.T) {
 	}
 	if got := loadState(eng.statePath("idle")).Branches["nogit"].Unpushed; got != 2 {
 		t.Fatalf("idle unpushed = %d", got)
+	}
+}
+
+type lockedBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func TestReportHidesToken(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "ghp_testtokenvalue")
+	var buf lockedBuf
+	eng := &Engine{Log: &buf}
+	eng.reportCommit("nogit", "", fmt.Errorf("auth failed ghp_testtokenvalue"))
+	got := buf.String()
+	if strings.Contains(got, "ghp_testtokenvalue") || !strings.Contains(got, "codex-collector: 提交失败 nogit") || !strings.Contains(got, "***") {
+		t.Fatalf("log = %q", got)
+	}
+}
+
+func TestCommitAndPushLogs(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+	data := t.TempDir()
+	must(t, os.WriteFile(filepath.Join(data, "config.json"), []byte(`{"email":"u42@example.com","consent":true,"pushEveryN":10}`), 0o644))
+	var buf lockedBuf
+	eng := &Engine{DataDir: data, Log: &buf}
+	start := eng.Handle([]byte(`{"hook_event_name":"SessionStart","session_id":"sess","cwd":"` + filepath.ToSlash(root) + `"}`))
+	if start.Action != "ready" {
+		t.Fatalf("start: %+v", start)
+	}
+	must(t, os.WriteFile(filepath.Join(root, "hello.py"), []byte("print('hi')\n"), 0o644))
+	res := eng.Handle(event(root, "turn-1"))
+	if res.Action != "sealed" {
+		t.Fatalf("seal: %+v", res)
+	}
+	eng.CommitAll(Config{Consent: true, PushEveryN: 10})
+	if !strings.Contains(buf.String(), "codex-collector: 提交成功 nogit") {
+		t.Fatalf("commit log = %q", buf.String())
+	}
+	if strings.Contains(buf.String(), "推送") {
+		t.Fatalf("push logged before the threshold: %q", buf.String())
+	}
+	n := strings.Count(buf.String(), "提交成功")
+	eng.CommitAll(Config{Consent: true, PushEveryN: 10})
+	if strings.Count(buf.String(), "提交成功") != n {
+		t.Fatalf("empty queue logged again: %q", buf.String())
+	}
+
+	gitDir := collectionGit(t, data)
+	key := filepath.Base(filepath.Dir(gitDir))
+	origin := filepath.Join(t.TempDir(), "missing.git")
+	if out, err := exec.Command("git", "--git-dir", gitDir, "remote", "add", "origin", origin).CombinedOutput(); err != nil {
+		t.Fatalf("remote add: %v %s", err, out)
+	}
+	eng.push(key, gitDir, "nogit", 1)
+	if !strings.Contains(buf.String(), "codex-collector: 推送失败 nogit") {
+		t.Fatalf("push log = %q", buf.String())
+	}
+
+	recs := readRecords(t, data)
+	if !strings.Contains(recs, "push 失败:") {
+		t.Fatalf("record dropped the git error: %s", recs)
+	}
+	for _, want := range []string{"会话开始", "已排队", "提交成功", "暂不推送"} {
+		if !strings.Contains(recs, want) {
+			t.Fatalf("records missing %s: %s", want, recs)
+		}
+	}
+}
+
+func TestRecordDetailDropsToken(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("GITHUB_TOKEN", "ghp_testtokenvalue")
+	appendRecord(data, Record{
+		RepoKey: "repo",
+		Reason:  reasonFailed,
+		Detail:  "push 失败: Authorization: Bearer ghp_testtokenvalue\nfatal: Authentication failed",
+	})
+	body := readRecords(t, data)
+	if strings.Contains(body, "ghp_testtokenvalue") || !strings.Contains(body, "fatal: Authentication failed") {
+		t.Fatalf("record = %s", body)
 	}
 }
 

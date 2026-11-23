@@ -9,7 +9,38 @@ import (
 	"strings"
 )
 
-var secretLine = regexp.MustCompile(`(?i)-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|(api[_-]?key|secret|token)\s*[:=]\s*\S{8,}`)
+// secretLine matches a whole trajectory line or the first 16KB of a file.
+// A match redacts that trajectory line, or keeps the file out of the commit.
+var secretLine = regexp.MustCompile(secretPattern)
+
+const secretPattern = `(?i)` +
+	`-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----` +
+	`|PuTTY-User-Key-File-` +
+	`|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}` +
+	`|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}` +
+	`|glpat-[A-Za-z0-9_\-]{20,}` +
+	`|xox[baprs]-[A-Za-z0-9\-]{10,}` +
+	"|hooks\\.slack\\.com/services/T[A-Za-z0-9]+/" +
+	`|sk_(?:live|test)_[A-Za-z0-9]{10,}|rk_(?:live|test)_[A-Za-z0-9]{10,}` +
+	`|AIza[0-9A-Za-z_\-]{20,}` +
+	`|ya29\.[0-9A-Za-z_\-]+` +
+	`|sk-(?:proj-|ant-)?[A-Za-z0-9_\-]{20,}` +
+	`|hf_[A-Za-z0-9]{20,}` +
+	`|pypi-[A-Za-z0-9_\-]{20,}` +
+	`|npm_[A-Za-z0-9]{20,}` +
+	`|SG\.[A-Za-z0-9_\-]{20,}` +
+	`|eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}` +
+	"|bearer\\s+[A-Za-z0-9\\-._~+/]{16,}={0,2}" +
+	"|(?:postgres(?:ql)?|mysql|mongodb(?:\\+srv)?|redis|amqp)://[^\\s:/]+:[^\\s@]{8,}@" +
+	"|[\"']?(?:api[ _-]?key|secret[ _-]?key|access[ _-]?key|private[ _-]?key|client[ _-]?secret|auth(?:entication)?[ _-]?token|refresh[ _-]?token|session[ _-]?token|password|passwd|pwd|secret|token|credential)[\"']?\\s*[:=]\\s*[\"']?[A-Za-z0-9+/=_\\-.~]{8,}" +
+	"|(?:api[ _-]?key|secret|token|password|passwd)\\s+is\\s+[A-Za-z0-9+/=_\\-.~]{8,}" +
+	"|(?:password|passwd|pwd)\\s*(?:is\\s*|[:=]\\s*)?(?:[A-Za-z0-9+/=_\\-.~]{8,}|\\d{6,})" +
+	"|(?:访问密钥|私钥|密钥|秘钥|令牌|密码|口令|凭证|凭据)\\s*(?:是|为|[:：=])?\\s*(?:[A-Za-z0-9+/=_\\-.~]{8,}|\\d{6,})" +
+	`|\b(?:ak|sk)\b["']?\s*[:=]\s*["']?[A-Za-z0-9+/=_\-.~]{8,}` +
+	`|\bsecret[_-]?key\b["']?\s*(?:is\s*|是\s*|为\s*|[:：=]\s*)["']?(?:[A-Za-z0-9+/=_\-.~]{8,}|\d{6,})` +
+	`|\bsecret[_-]?key\b["']?\s+["']?(?:\d[A-Za-z0-9+/=_\-.~]{7,}|[A-Za-z+/=_\-.~]+\d[A-Za-z0-9+/=_\-.~]{6,}|\d{6,})` +
+	`|\bsecret key\b["']?\s*(?:is\s*|是\s*|为\s*|[:：=]\s*)["']?(?:[A-Za-z0-9+/=_\-.~]{8,}|\d{6,})` +
+	`|\bsecret key\b["']?\s+["']?(?:\d[A-Za-z0-9+/=_\-.~]{7,}|[A-Za-z+/=_\-.~]+\d[A-Za-z0-9+/=_\-.~]{6,}|\d{6,})`
 
 var largeSuffix = map[string]bool{
 	".pt": true, ".pth": true, ".onnx": true, ".safetensors": true, ".gguf": true,

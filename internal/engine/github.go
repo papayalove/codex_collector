@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -22,6 +23,28 @@ func githubToken() string {
 		return v
 	}
 	return strings.TrimSpace(os.Getenv("GH_TOKEN"))
+}
+
+// gitAuthArgs supplies the GitHub token to this push only.
+// Creating the remote uses the token on the HTTP API. git push does not read
+// that variable, and the collector has no window to ask for a password.
+// An Authorization extra header is not enough: Git still asks for a username
+// and then exits because the terminal prompt is disabled. Rewriting the URL
+// for this command only puts the token in the request. The saved remote and
+// other GitHub accounts on the machine are left unchanged.
+func gitAuthArgs(remote string) []string {
+	if _, ok := githubOwner(remote); !ok {
+		return nil
+	}
+	token := githubToken()
+	if token == "" {
+		return nil
+	}
+	user := url.UserPassword("x-access-token", token).String()
+	return []string{
+		"-c", "credential.helper=",
+		"-c", "url.https://" + user + "@github.com/.insteadOf=https://github.com/",
+	}
 }
 
 func githubOwner(namespace string) (string, bool) {

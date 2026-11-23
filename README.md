@@ -40,13 +40,13 @@
   ```
 4. 完全退出 Codex，然后重新打开。Windows 要退出托盘里的图标。Mac 要退出菜单栏里的 Codex，不要只关窗口。Linux 桌面端同样要完全退出。
 
-## 填写配置
 
-插件安装时还没运行，不能自己写出这个文件。请手动复制安装包里的模版：
+
+## 填写配置
 
 1. 在用户目录下新建文件夹 `.codex-collector`。
 2. 把插件目录里的 `config.example.json` 复制进去，重命名为 `config.json`。
-3. 用文本编辑器打开 `config.json`，修改 `email`。
+3. 向使用者询问邮箱，把使用者的回答写入 `email`。模版里这个值是空的，不要填成别人的地址。
 
 三套系统的配置文件位置：
 
@@ -55,13 +55,15 @@
 
 ```json
 {
-  "email": "你的邮箱",
+  "email": "你的邮箱@gmail.com",
   "enterpriseNamespace": "https://公司Git地址/采集空间",
-  "pushEveryN": 2,
+  "pushEveryN": 1,
   "consent": true,
   "maxFileBytes": 1073741824
 }
 ```
+
+`email` 必须留到询问使用者之后再填。不要把上面的示例换成作者或仓库里出现过的邮箱。
 
 `maxFileBytes` 默认是 1GB。只有文件名后缀对不上、体积又超过这个值时，才按大文件处理。
 
@@ -82,7 +84,11 @@ Linux 和 Mac 的例子：
 "dataDir": "/data/codex-collector"
 ```
 
+
+
 ## 设置 GitHub 令牌
+
+
 
 ### Windows
 
@@ -92,60 +98,21 @@ Linux 和 Mac 的例子：
 setx GITHUB_TOKEN "公司令牌"
 ```
 
-### Linux 和 Mac 命令行
 
-下面两条只对命令行生效：保存后新开一个终端，命令行里的 Codex 就能读到。
+
+### Linux 和 Mac
+
+下面两条对命令行和桌面端都生效。命令行保存后新开一个终端即可。桌面端要完全退出 Codex 再打开。
 
 ```bash
-# Linux 命令行
+# Linux
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
 
-# Mac 命令行
+# Mac
 echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 ```
 
-### Linux 和 Mac 桌面端
 
-完成后完全退出 Codex 再打开。
-
-Linux：
-
-```bash
-# 替换下方的公司令牌
-mkdir -p ~/.config/environment.d
-printf 'GITHUB_TOKEN=公司令牌\n' > ~/.config/environment.d/codex-collector.conf
-```
-
-然后注销当前电脑用户并重新登录。
-
-Mac 写入登录时自动执行的启动项，以后不用每次手动设置：
-
-```bash
-# 替换下方的公司令牌
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/com.codex-collector.github-token.plist <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.codex-collector.github-token</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/launchctl</string>
-    <string>setenv</string>
-    <string>GITHUB_TOKEN</string>
-    <string>公司令牌</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-</dict>
-</plist>
-EOF
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-collector.github-token.plist
-```
-
-然后完全退出 Codex 再打开。注销或重启电脑之后，桌面端仍会自动带上这个令牌。
 
 ## 允许钩子运行
 

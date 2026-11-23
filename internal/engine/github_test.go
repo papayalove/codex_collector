@@ -3,6 +3,7 @@ package engine
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -47,6 +48,24 @@ func TestEnsureGitHubRepoSkipsWhenPresent(t *testing.T) {
 	err := ensureGitHubRepo(githubClient{API: srv.URL, Token: "test-token", HTTP: srv.Client()}, "alice", "abc")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGitAuthArgsUsesTokenForGitHub(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "ghp_testtokenvalue")
+	t.Setenv("GH_TOKEN", "")
+	args := gitAuthArgs("https://github.com/codex-collector/repo.git")
+	got := strings.Join(args, "\n")
+	if !strings.Contains(got, "credential.helper=") || !strings.Contains(got, "url.https://x-access-token:ghp_testtokenvalue@github.com/.insteadOf=https://github.com/") {
+		t.Fatalf("args = %q", args)
+	}
+	if args := gitAuthArgs("https://git.example.test/collect/repo.git"); args != nil {
+		t.Fatalf("non-github args = %q", args)
+	}
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GH_TOKEN", "")
+	if args := gitAuthArgs("https://github.com/codex-collector/repo.git"); args != nil {
+		t.Fatalf("missing token args = %q", args)
 	}
 }
 

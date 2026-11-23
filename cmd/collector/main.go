@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"codex-collector/internal/engine"
@@ -43,13 +45,34 @@ func dataDir() string {
 	return engine.EffectiveDataDir(base, loadCfg(base))
 }
 
+func withDaemonLock(fn func()) {
+	dir := dataDir()
+	_ = os.MkdirAll(dir, 0o755)
+	f, err := os.OpenFile(filepath.Join(dir, "daemon.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		fn()
+		return
+	}
+	defer f.Close()
+	lockFile(f)
+	defer unlockFile(f)
+	fn()
+}
+
 func runHook() {
 	body, _ := io.ReadAll(os.Stdin)
 	if len(bytes.TrimSpace(body)) == 0 {
 		return
 	}
+	withDaemonLock(func() { ensureCurrentDaemon() })
 	if err := call(body); err != nil {
-		_ = startDaemon()
+		withDaemonLock(func() {
+			owner := collectorOwnerPID()
+			info, loadErr := loadDaemonInfo()
+			if loadErr != nil || info.OwnerPid != owner || !processAlive(info.Pid) {
+				_ = startDaemon(owner)
+			}
+		})
 		deadline := time.Now().Add(3 * time.Second)
 		for time.Now().Before(deadline) {
 			if call(body) == nil {
@@ -57,6 +80,82 @@ func runHook() {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
+	}
+}
+
+type daemonInfo struct {
+	Addr       string `json:"addr"`
+	Token      string `json:"token"`
+	Pid        int    `json:"pid"`
+	OwnerPid   int    `json:"ownerPid"`
+	TokenStamp string `json:"tokenStamp,omitempty"`
+}
+
+// ensureCurrentDaemon starts the collector that belongs to this Codex process.
+// The daemon is detached, so closing Codex leaves the previous process running.
+// The next hook after Codex starts again replaces that process. It is also
+// replaced once when a shell token was not passed to the running process.
+func ensureCurrentDaemon() {
+	owner := collectorOwnerPID()
+	if owner <= 0 {
+		return
+	}
+	info, err := loadDaemonInfo()
+	running := err == nil && info.Pid > 0 && processAlive(info.Pid)
+	if running && !shouldReplaceDaemon(info.OwnerPid, owner) && info.TokenStamp == currentTokenStamp() {
+		return
+	}
+	if err == nil {
+		pid := info.Pid
+		if pid <= 0 {
+			pid = listenerPID(info.Addr)
+		}
+		stopCollector(pid)
+	}
+	_ = os.Remove(filepath.Join(dataDir(), "daemon.json"))
+	if err := startDaemon(owner); err != nil {
+		return
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if daemonReachable() {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func shouldReplaceDaemon(storedOwner, currentOwner int) bool {
+	if currentOwner <= 0 {
+		return false
+	}
+	return storedOwner != currentOwner
+}
+
+func daemonReachable() bool {
+	addr, _, err := readDaemonFile()
+	if err != nil {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+func stopCollector(pid int) {
+	if pid <= 0 || pid == os.Getpid() {
+		return
+	}
+	if !strings.Contains(strings.ToLower(processName(pid)), "collector") {
+		return
+	}
+	killProcess(pid)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && processAlive(pid) {
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -82,34 +181,40 @@ func call(body []byte) error {
 	return err
 }
 
-func readDaemonFile() (string, string, error) {
+func loadDaemonInfo() (daemonInfo, error) {
 	b, err := os.ReadFile(filepath.Join(dataDir(), "daemon.json"))
 	if err != nil {
-		return "", "", err
+		return daemonInfo{}, err
 	}
-	var info struct {
-		Addr  string `json:"addr"`
-		Token string `json:"token"`
-	}
+	var info daemonInfo
 	if err := json.Unmarshal(b, &info); err != nil {
+		return daemonInfo{}, err
+	}
+	return info, nil
+}
+
+func readDaemonFile() (string, string, error) {
+	info, err := loadDaemonInfo()
+	if err != nil {
 		return "", "", err
 	}
 	return info.Addr, info.Token, nil
 }
 
-func startDaemon() error {
+func startDaemon(owner int) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(exe, "daemon")
-	cmd.Env = os.Environ()
+	cmd := exec.Command(exe, "daemon", strconv.Itoa(owner), currentTokenStamp())
+	cmd.Env = daemonEnviron()
 	detach(cmd)
 	return cmd.Start()
 }
 
 func runDaemon() {
 	ignoreDaemonSignals()
+	applyShellTokens()
 	base := configDir()
 	dir := dataDir()
 	_ = os.MkdirAll(base, 0o755)
@@ -121,9 +226,17 @@ func runDaemon() {
 	buf := make([]byte, 16)
 	_, _ = rand.Read(buf)
 	token := hex.EncodeToString(buf)
-	info, _ := json.Marshal(map[string]string{"addr": ln.Addr().String(), "token": token})
-	_ = os.WriteFile(filepath.Join(dir, "daemon.json"), info, 0o600)
-	eng := &engine.Engine{DataDir: dir, ConfigDir: base}
+	owner := 0
+	if len(os.Args) >= 3 {
+		owner, _ = strconv.Atoi(os.Args[2])
+	}
+	stamp := ""
+	if len(os.Args) >= 4 {
+		stamp = os.Args[3]
+	}
+	raw, _ := json.Marshal(daemonInfo{Addr: ln.Addr().String(), Token: token, Pid: os.Getpid(), OwnerPid: owner, TokenStamp: stamp})
+	_ = os.WriteFile(filepath.Join(dir, "daemon.json"), raw, 0o600)
+	eng := &engine.Engine{DataDir: dir, ConfigDir: base, Log: os.Stderr}
 	eng.ClearStalePush()
 	eng.AfterPush = func() { eng.CommitAll(loadCfg(base)) }
 	go func() {

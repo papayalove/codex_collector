@@ -20,4 +20,7 @@ func detach(cmd *exec.Cmd) {
 	cmd.Stdin = f
 	cmd.Stdout = f
 	cmd.Stderr = f
+	if tty := consoleWriter(); tty != nil {
+		cmd.Stderr = tty
+	}
 }
