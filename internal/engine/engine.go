@@ -66,6 +66,7 @@ type hookEvent struct {
 	CWD        string `json:"cwd"`
 	Transcript string `json:"transcript_path"`
 	Model      string `json:"model"`
+	Host       string `json:"host"`
 }
 
 func (e *Engine) Handle(raw []byte) Result {
@@ -85,7 +86,7 @@ func (e *Engine) Handle(raw []byte) Result {
 	case "SessionEnd":
 		return e.onStop(ev, cfg, true)
 	case "Interrupt":
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonIdle, Detail: "中断"})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonIdle, Detail: "中断"})
 		return Result{Action: "skip", Detail: "已记录中断"}
 	default:
 		return Result{Action: "skip"}
@@ -113,25 +114,25 @@ func (e *Engine) identity(cfg Config) (string, string) {
 func (e *Engine) onStart(ev hookEvent, cfg Config) Result {
 	root, skip := snapshotRoot(ev.CWD)
 	if skip != "" {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, Reason: reasonSkipped, Detail: skip})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, Host: ev.Host, Reason: reasonSkipped, Detail: skip})
 		return Result{Action: "record", Detail: skip}
 	}
 	userID, source := e.identity(cfg)
 	key := repoKey(userID, root)
 	gitDir := filepath.Join(e.DataDir, "repos", key, ".git")
 	if err := e.Git.init(gitDir); err != nil {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Reason: reasonFailed, Detail: err.Error()})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 		return Result{Action: "record", Detail: "仓库初始化失败"}
 	}
 	st := loadState(e.statePath(key))
 	if len(st.Files) == 0 {
 		meta, stop, err := scanMeta(filepath.FromSlash(root), cfg.MaxSnapshotFiles, cfg.MaxFileBytes)
 		if err != nil {
-			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Reason: reasonFailed, Detail: err.Error()})
+			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 			return Result{Action: "record", Detail: "扫描失败"}
 		}
 		if stop != "" {
-			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Reason: reasonSkipped, Detail: stop})
+			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, Host: ev.Host, Reason: reasonSkipped, Detail: stop})
 			return Result{Action: "record", Detail: stop}
 		}
 		st.Files = filesFromMeta(meta)
@@ -144,7 +145,7 @@ func (e *Engine) onStart(ev hookEvent, cfg Config) Result {
 	if cfg.EnterpriseNamespace != "" {
 		go e.startRemote(cfg, gitDir, key)
 	}
-	e.record(key, ev.SessionID, "", reasonStart, source)
+	e.record(key, ev.SessionID, "", ev.Host, reasonStart, source)
 	return Result{Action: "ready", Detail: source}
 }
 
@@ -219,7 +220,7 @@ func pendingPush(st repoState, every int) (string, int) {
 func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	root, skip := snapshotRoot(ev.CWD)
 	if skip != "" {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonSkipped, Detail: skip})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonSkipped, Detail: skip})
 		return Result{Action: "record", Detail: skip}
 	}
 	userID, source := e.identity(cfg)
@@ -230,21 +231,21 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 
 	gitDir := filepath.Join(e.DataDir, "repos", key, ".git")
 	if err := e.Git.init(gitDir); err != nil {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonFailed, Detail: err.Error()})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 		return Result{Action: "record", Detail: "仓库初始化失败"}
 	}
 	st := loadState(e.statePath(key))
 	if st.Paused {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonSkipped, Detail: "仓库已到 20 GiB"})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonSkipped, Detail: "仓库已到 20 GiB"})
 		return Result{Action: "record", Detail: "仓库已暂停"}
 	}
 	meta, stop, err := scanMeta(filepath.FromSlash(root), cfg.MaxSnapshotFiles, cfg.MaxFileBytes)
 	if err != nil {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonFailed, Detail: err.Error()})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 		return Result{Action: "record", Detail: "扫描失败"}
 	}
 	if stop != "" {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonSkipped, Detail: stop})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonSkipped, Detail: stop})
 		return Result{Action: "record", Detail: stop}
 	}
 	changed := metadataChanged(st.Files, meta)
@@ -258,12 +259,12 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	}
 	if !changed {
 		if !sessionEnd {
-			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonIdle, Detail: "没有文件改动"})
+			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonIdle, Detail: "没有文件改动"})
 			return Result{Action: "skip", Detail: "没有文件改动"}
 		}
 		loadTrajectory()
 		if tlen == st.TranscriptLen || tlen == 0 {
-			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonIdle, Detail: "没有文件改动"})
+			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonIdle, Detail: "没有文件改动"})
 			return Result{Action: "skip", Detail: "没有文件改动"}
 		}
 	} else {
@@ -272,7 +273,7 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	branch, head := userBranch(root)
 	tree, files, err := e.buildTree(gitDir, root, st.Files, meta, trajectories, ev, branch, head, source, userID, cfg.MaxFileBytes)
 	if err != nil {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonFailed, Detail: err.Error()})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 		return Result{Action: "record", Detail: "记树失败"}
 	}
 	jobs := loadJobs(e.queuePath(key))
@@ -280,9 +281,9 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	if turn == "" {
 		turn = "session-end"
 	}
-	jobs = append(jobs, Job{Tree: tree, Branch: branch, TurnIDs: []string{turn}, SessionID: ev.SessionID, UserHead: head})
+	jobs = append(jobs, Job{Tree: tree, Branch: branch, TurnIDs: []string{turn}, SessionID: ev.SessionID, UserHead: head, Host: hostLabel(ev.Host)})
 	if err := saveJobs(e.queuePath(key), jobs); err != nil {
-		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
+		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 		return Result{Action: "record", Detail: "排队失败"}
 	}
 	st.RepoKey = key
@@ -292,7 +293,7 @@ func (e *Engine) onStop(ev hookEvent, cfg Config, sessionEnd bool) Result {
 	st.Files = files
 	st.TranscriptLen = tlen
 	_ = st.save(e.statePath(key))
-	e.record(key, ev.SessionID, turn, reasonQueued, branch)
+	e.record(key, ev.SessionID, turn, ev.Host, reasonQueued, branch)
 	return Result{Action: "sealed", Detail: branch}
 }
 
@@ -314,7 +315,7 @@ func metadataChanged(prev map[string]fileState, items []scanned) bool {
 		}
 	}
 	for path := range prev {
-		if strings.HasPrefix(path, ".codex-collect/") {
+		if strings.HasPrefix(path, ".trace-collector/") || strings.HasPrefix(path, ".codex-collect/") {
 			continue
 		}
 		if !seen[path] {
@@ -327,7 +328,7 @@ func metadataChanged(prev map[string]fileState, items []scanned) bool {
 func redact(b []byte) []byte {
 	lines := bytes.Split(b, []byte("\n"))
 	for i, line := range lines {
-		if secretLine.Match(line) {
+		if hasSecret(line) {
 			lines[i] = []byte("[REDACTED]")
 		}
 	}
@@ -402,8 +403,9 @@ func (e *Engine) buildTree(gitDir, project string, prev map[string]fileState, it
 	if err != nil {
 		return "", nil, err
 	}
-	info = append(info, indexInfo("100644", msha, ".codex-collect/manifest.json")...)
-	repoDir := filepath.Join(e.DataDir, "repos", repoKey(userID, project))
+	agent := hostLabel(ev.Host)
+	info = append(info, indexInfo("100644", msha, collectPath(agent, "manifest.json"))...)
+	repoDir := filepath.Join(e.DataDir, "repos", repoKey(userID, project), agent)
 	_ = os.MkdirAll(repoDir, 0o755)
 	_ = os.WriteFile(filepath.Join(repoDir, "manifest.json"), mb, 0o644)
 	var trajectoryNames, trajectorySources []string
@@ -415,6 +417,7 @@ func (e *Engine) buildTree(gitDir, project string, prev map[string]fileState, it
 		"userId": userID, "userIdSource": source, "projectPath": project,
 		"sessionId": ev.SessionID, "turnId": ev.TurnID, "model": ev.Model,
 		"branch": branch, "userHead": head, "frozenAt": e.now().Format(time.RFC3339),
+		"host": hostLabel(ev.Host), "agentVersion": e.agentVersion(ev.Host),
 		"codexVersion": e.codexVersion(), "trajectories": trajectoryNames, "trajectorySources": trajectorySources,
 	}
 	metab, _ := json.Marshal(meta)
@@ -422,16 +425,19 @@ func (e *Engine) buildTree(gitDir, project string, prev map[string]fileState, it
 	if err != nil {
 		return "", nil, err
 	}
-	info = append(info, indexInfo("100644", metasha, ".codex-collect/meta/"+safeName(ev.TurnID)+".json")...)
+	info = append(info, indexInfo("100644", metasha, collectPath(agent, "meta/"+safeName(ev.TurnID)+".json"))...)
+	metaDir := filepath.Join(repoDir, "meta")
+	_ = os.MkdirAll(metaDir, 0o755)
+	_ = os.WriteFile(filepath.Join(metaDir, safeName(ev.TurnID)+".json"), metab, 0o644)
 	if len(trajectories) > 0 {
-		trajDir := filepath.Join(e.DataDir, "repos", repoKey(userID, project), "trajectory")
+		trajDir := filepath.Join(repoDir, "trajectory")
 		_ = os.MkdirAll(trajDir, 0o755)
 		for _, file := range trajectories {
 			tsha, err := e.Git.hashStdin(gitDir, file.Body)
 			if err != nil {
 				return "", nil, err
 			}
-			info = append(info, indexInfo("100644", tsha, ".codex-collect/trajectory/"+file.Name)...)
+			info = append(info, indexInfo("100644", tsha, collectPath(agent, "trajectory/"+file.Name))...)
 			_ = os.WriteFile(filepath.Join(trajDir, file.Name), file.Body, 0o644)
 		}
 	}
@@ -584,7 +590,8 @@ func (e *Engine) commitRepo(key string, cfg Config) {
 				}
 			}
 		}
-		tree := e.treeWithRecords(gitDir, key, job.Tree)
+		tree := e.keepAgentHistory(gitDir, parent, job.Tree, job.Host)
+		tree = e.treeWithRecords(gitDir, key, tree, job.Host)
 		sha, err := e.Git.commitTree(gitDir, tree, parent, "collect "+job.Branch+" "+strings.Join(job.TurnIDs, ","))
 		if err != nil {
 			appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
@@ -605,7 +612,7 @@ func (e *Engine) commitRepo(key string, cfg Config) {
 		st.Branches[job.Branch] = br
 		lastOK = job.Branch
 		e.reportCommit(job.Branch, sha, nil)
-		e.record(key, job.SessionID, strings.Join(job.TurnIDs, ","), reasonCommit, fmt.Sprintf("%s %s 待推送 %d", job.Branch, shortSHA(sha), br.Unpushed))
+		e.record(key, job.SessionID, strings.Join(job.TurnIDs, ","), job.Host, reasonCommit, fmt.Sprintf("%s %s 待推送 %d", job.Branch, shortSHA(sha), br.Unpushed))
 	}
 	warnBranch := ""
 	if warnNow && lastOK != "" {
@@ -616,12 +623,63 @@ func (e *Engine) commitRepo(key string, cfg Config) {
 	e.maybePush(key, gitDir, &st, cfg, warnBranch)
 }
 
-func (e *Engine) treeWithRecords(gitDir, key, tree string) string {
-	b, err := os.ReadFile(filepath.Join(e.DataDir, "repos", key, "records.jsonl"))
+func collectPath(host string, rest string) string {
+	return ".trace-collector/" + host + "/" + rest
+}
+
+// keepAgentHistory copies .trace-collector paths from the parent commit into the new snapshot.
+// The current agent's new files replace only their own paths. Other agents stay on the branch tip.
+func (e *Engine) keepAgentHistory(gitDir, parent, tree, host string) string {
+	if parent == "" || tree == "" {
+		return tree
+	}
+	old, err := e.Git.listTree(gitDir, parent)
+	if err != nil {
+		return tree
+	}
+	next, err := e.Git.listTree(gitDir, tree)
+	if err != nil {
+		return tree
+	}
+	own := collectPath(hostLabel(host), "")
+	byPath := map[string]treeItem{}
+	var order []string
+	add := func(ent treeItem) {
+		if _, ok := byPath[ent.Path]; !ok {
+			order = append(order, ent.Path)
+		}
+		byPath[ent.Path] = ent
+	}
+	for _, ent := range old {
+		if strings.HasPrefix(ent.Path, ".trace-collector/") {
+			add(ent)
+		}
+	}
+	for _, ent := range next {
+		if strings.HasPrefix(ent.Path, ".trace-collector/") && !strings.HasPrefix(ent.Path, own) {
+			continue
+		}
+		add(ent)
+	}
+	entries := make([]treeItem, 0, len(order))
+	for _, path := range order {
+		entries = append(entries, byPath[path])
+	}
+	indexPath := filepath.Join(e.DataDir, "index", "agents-"+safeName(parent))
+	merged, err := e.Git.treeFromEntries(gitDir, indexPath, entries)
+	_ = os.Remove(indexPath)
+	if err != nil {
+		return tree
+	}
+	return merged
+}
+
+func (e *Engine) treeWithRecords(gitDir, key, tree, host string) string {
+	b, err := os.ReadFile(filepath.Join(e.DataDir, "repos", key, hostLabel(host), "records.jsonl"))
 	if err != nil || len(bytes.TrimSpace(b)) == 0 || tree == "" {
 		return tree
 	}
-	next, err := e.Git.treeWithFile(gitDir, tree, filepath.Join(e.DataDir, "index", key+"-records"), ".codex-collect/records.jsonl", b)
+	next, err := e.Git.treeWithFile(gitDir, tree, filepath.Join(e.DataDir, "index", key+"-records"), collectPath(hostLabel(host), "records.jsonl"), b)
 	if err != nil {
 		return tree
 	}
@@ -664,7 +722,7 @@ func (e *Engine) writeWarnFile(key, gitDir string, st *repoState, prefer string,
 		e.reportCommit(branch, "", err)
 		return ""
 	}
-	newTree = e.treeWithRecords(gitDir, key, newTree)
+	newTree = e.treeWithRecords(gitDir, key, newTree, "")
 	sha, err := e.Git.commitTree(gitDir, newTree, parent, "容量达到上限的 90%")
 	if err != nil {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
@@ -681,7 +739,7 @@ func (e *Engine) writeWarnFile(key, gitDir string, st *repoState, prefer string,
 	br.Unpushed++
 	st.Branches[branch] = br
 	e.reportCommit(branch, sha, nil)
-	e.record(key, "", "", reasonCommit, fmt.Sprintf("%s %s 待推送 %d 容量预警", branch, shortSHA(sha), br.Unpushed))
+	e.record(key, "", "", "", reasonCommit, fmt.Sprintf("%s %s 待推送 %d 容量预警", branch, shortSHA(sha), br.Unpushed))
 	return branch
 }
 
@@ -708,7 +766,7 @@ func (e *Engine) maybePush(key, gitDir string, st *repoState, cfg Config, forceB
 			continue
 		}
 		if !st.NextPushAt.IsZero() && e.now().Before(st.NextPushAt) {
-			e.record(key, "", "", reasonHold, fmt.Sprintf("%s 已有 %d 次，%s 后再推", name, br.Unpushed, st.NextPushAt.Format(time.RFC3339)))
+			e.record(key, "", "", "", reasonHold, fmt.Sprintf("%s 已有 %d 次，%s 后再推", name, br.Unpushed, st.NextPushAt.Format(time.RFC3339)))
 			return
 		}
 		st.Pushing = true
@@ -735,7 +793,7 @@ func (e *Engine) noteNotPushed(key string, st *repoState, every int, remote bool
 		} else if every > 0 {
 			detail += fmt.Sprintf("，满 %d 次再推", every)
 		}
-		e.record(key, "", "", reasonHold, detail)
+		e.record(key, "", "", "", reasonHold, detail)
 	}
 }
 
@@ -743,6 +801,16 @@ func (e *Engine) push(key, gitDir, branch string, count int) {
 	remote, _ := e.Git.run(gitDir, []string{"GIT_TERMINAL_PROMPT=0"}, "remote", "get-url", "origin")
 	args := append(gitAuthArgs(remote), "push", "origin", branch)
 	_, err := e.Git.run(gitDir, []string{"GIT_TERMINAL_PROMPT=0"}, args...)
+	forced := false
+	if err != nil && pushRejected(err) {
+		// Another machine already pushed a different history for this same
+		// collection repo. Waiting would leave every later attempt rejected.
+		// The local tip is the collection this machine just made, so replace
+		// the remote branch with it.
+		forced = true
+		args = append(gitAuthArgs(remote), "push", "--force", "origin", branch)
+		_, err = e.Git.run(gitDir, []string{"GIT_TERMINAL_PROMPT=0"}, args...)
+	}
 	lk := e.lock(key)
 	lk.Lock()
 	st := loadState(e.statePath(key))
@@ -762,10 +830,13 @@ func (e *Engine) push(key, gitDir, branch string, count int) {
 		st.PushFails = 0
 		st.NextPushAt = time.Time{}
 		detail := fmt.Sprintf("%s %d 个提交", branch, count)
+		if forced {
+			detail += " 强制覆盖"
+		}
 		if remote = strings.TrimSpace(remote); remote != "" {
 			detail += " " + remote
 		}
-		e.record(key, "", "", reasonPush, detail)
+		e.record(key, "", "", "", reasonPush, detail)
 	}
 	_ = st.save(e.statePath(key))
 	lk.Unlock()
@@ -775,8 +846,21 @@ func (e *Engine) push(key, gitDir, branch string, count int) {
 	}
 }
 
-func (e *Engine) record(key, session, turn, reason, detail string) {
-	appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: session, TurnID: turn, Reason: reason, Detail: detail})
+// pushRejected reports a remote branch that moved without this local history.
+// Authentication and network failures are not rejections and must keep backing off.
+func pushRejected(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "non-fast-forward") ||
+		strings.Contains(s, "[rejected]") ||
+		strings.Contains(s, "fetch first") ||
+		strings.Contains(s, "tip of your current branch is behind")
+}
+
+func (e *Engine) record(key, session, turn, host, reason, detail string) {
+	appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, SessionID: session, TurnID: turn, Host: host, Reason: reason, Detail: detail})
 }
 
 func shortSHA(sha string) string {

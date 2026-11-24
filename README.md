@@ -10,7 +10,7 @@
 
 - 电脑上已安装 Codex 桌面端或 Codex 命令行，并且能正常对话。
 - 电脑上已安装 Git。
-- 本机已设置 GitHub 令牌，见下面「设置 GitHub 令牌」。不要把令牌写进插件目录或 `config.json`。
+- 本机已设置 Gitee 私人令牌，见下面「设置 Gitee 令牌」。不要把令牌写进插件目录或 `config.json`。
 
 ## 安装
 
@@ -44,14 +44,14 @@
 
 ## 填写配置
 
-1. 在用户目录下新建文件夹 `.codex-collector`。
+1. 在用户目录下新建文件夹 `.trace-collector`。
 2. 把插件目录里的 `config.example.json` 复制进去，重命名为 `config.json`。
 3. 向使用者询问邮箱，把使用者的回答写入 `email`。模版里这个值是空的，不要填成别人的地址。
 
 三套系统的配置文件位置：
 
-- Windows：`C:\Users\你的用户名\.codex-collector\config.json`
-- Linux 和 Mac：`~/.codex-collector/config.json`
+- Windows：`C:\Users\你的用户名\.trace-collector\config.json`
+- Linux 和 Mac：`~/.trace-collector/config.json`
 
 ```json
 {
@@ -69,48 +69,47 @@
 
 采集仓库默认在配置文件旁边的 `repos` 目录里：
 
-- Windows：`C:\Users\你的用户名\.codex-collector\repos`
-- Linux 和 Mac：`~/.codex-collector/repos`
+- Windows：`C:\Users\你的用户名\.trace-collector\repos`
+- Linux 和 Mac：`~/.trace-collector/repos`
 
 Windows 上如果 C 盘空间不够，在这份 `config.json` 里自行增加 `dataDir`，把插件数据改到其他盘。已有的采集仓库不会自动搬走。保存后完全退出 Codex 再打开。
 
 ```json
-"dataDir": "D:/codex-collector"
+"dataDir": "D:/trace-collector"
 ```
 
 Linux 和 Mac 的例子：
 
 ```json
-"dataDir": "/data/codex-collector"
+"dataDir": "/data/trace-collector"
 ```
 
 
 
-## 设置 GitHub 令牌
+## 设置 Gitee 令牌
 
-
+`enterpriseNamespace` 写成 `https://gitee.com/组织名`。企业版可以直接填仓库组页面，例如 `https://gitee.pjlab.org.cn/L2/_source/groups/L2/agent-trace/trace-collector-repos/repos/`，采集器会收成子组 `https://gitee.pjlab.org.cn/L2/agent-trace/trace-collector-repos/repos`。私人令牌勾选 Git http push 和代码库。不要把令牌写进插件目录或 `config.json`。
 
 ### Windows
 
-在 PowerShell 里执行。
+在 PowerShell 里执行。执行后重新打开终端。桌面端要完全退出 Codex 再打开。已经开着的命令行窗口不会读到这次写入的令牌。
 
 ```powershell
-setx GITHUB_TOKEN "公司令牌"
+setx GITEE_TOKEN "私人令牌"
 ```
-
-
 
 ### Linux 和 Mac
 
-下面两条对命令行和桌面端都生效。命令行保存后新开一个终端即可。桌面端要完全退出 Codex 再打开。
+下面两条对命令行和桌面端都生效。命令行保存后新开一个终端即可。桌面端要完全退出 Codex 再打开。令牌必须是字面量。
 
 ```bash
 # Linux
-echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.bashrc
+echo 'export GITEE_TOKEN="私人令牌"' >> ~/.bashrc
 
 # Mac
-echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
+echo 'export GITEE_TOKEN="私人令牌"' >> ~/.zshrc
 ```
+
 
 
 
@@ -130,7 +129,7 @@ echo 'export GITHUB_TOKEN="公司令牌"' >> ~/.zshrc
 
 1. 用 Codex 打开一个普通项目文件夹。不要打开用户主目录。
 2. 新开一个对话，让它改一个项目文件。
-3. 这一轮结束后，用户目录下会出现采集记录。Windows 看 `C:\Users\你的用户名\.codex-collector\repos`，Linux 和 Mac 看 `~/.codex-collector/repos`。
+3. 这一轮结束后，用户目录下会出现采集记录。Windows 看 `C:\Users\你的用户名\.trace-collector\repos`，Linux 和 Mac 看 `~/.trace-collector/repos`。
 
 有文件改动时，采集仓库里会多一次提交，并按配置推送到公司仓库。只打招呼、没有改文件时，这里不会多出提交。
 

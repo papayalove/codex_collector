@@ -17,6 +17,7 @@ func TestParseTokenLine(t *testing.T) {
 		{`export GITHUB_TOKEN="quoted"`, "GITHUB_TOKEN", "quoted", true},
 		{`GH_TOKEN='single'`, "GH_TOKEN", "single", true},
 		{`export CODEUP_TOKEN=plain # note`, "CODEUP_TOKEN", "plain", true},
+		{`export GITEE_TOKEN="gitee-token"`, "GITEE_TOKEN", "gitee-token", true},
 		{`# export GITHUB_TOKEN=hidden`, "", "", false},
 		{`export OTHER=value`, "", "", false},
 		{`export GITHUB_TOKEN=$OTHER`, "", "", false},
@@ -38,6 +39,7 @@ func TestShellTokenEnvReadsBashrc(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("CODEUP_TOKEN", "")
 	t.Setenv("YUNXIAO_TOKEN", "")
+	t.Setenv("GITEE_TOKEN", "")
 	body := "export PATH=/bin\nexport GITHUB_TOKEN=from-bashrc\nexport GH_TOKEN=from-gh\n"
 	if err := os.WriteFile(filepath.Join(home, ".bashrc"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)

@@ -11,6 +11,9 @@ import (
 	"syscall"
 )
 
+// collectorOwnerPID is the host agent process (Codex or Claude Code) for this
+// hook. It stays the same while that agent is open, and changes after the agent
+// is started again.
 func collectorOwnerPID() int {
 	pid := os.Getpid()
 	fallback := os.Getppid()
@@ -19,7 +22,7 @@ func collectorOwnerPID() int {
 		if parent <= 0 || parent == pid {
 			break
 		}
-		if strings.Contains(strings.ToLower(processName(parent)), "codex") {
+		if isAgentProcessName(processName(parent)) {
 			return parent
 		}
 		pid = parent

@@ -1,0 +1,15 @@
+{
+  "name": "claude-collector-local",
+  "owner": {
+    "name": "claude-collector"
+  },
+  "plugins": [
+    {
+      "name": "claude-collector",
+      "source": "./claude-collector",
+      "description": "按轮次把项目快照和对话提交到企业采集仓库",
+      "version": "0.1.9",
+      "category": "Developer Tools"
+    }
+  ]
+}

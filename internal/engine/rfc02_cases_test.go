@@ -248,7 +248,7 @@ func testSpecialFiles(t *testing.T) {
 			t.Fatalf("%s entered the commit", missing)
 		}
 	}
-	manifest := gitShow(t, gitDir, branch+":.codex-collect/manifest.json")
+	manifest := gitShow(t, gitDir, branch+":.trace-collector/codex/manifest.json")
 	for _, item := range []string{"models/w.pt", "pack.zip", "data.parquet", "model.safetensors"} {
 		if !strings.Contains(manifest, item) || !strings.Contains(manifest, "大文件") {
 			t.Fatalf("manifest missing large %s: %s", item, manifest)
@@ -306,7 +306,7 @@ func testSizeFallback(t *testing.T) {
 	if gitShow(t, gitDir, "nogit:note.txt") != "small" {
 		t.Fatal("small file was dropped")
 	}
-	manifest := gitShow(t, gitDir, "nogit:.codex-collect/manifest.json")
+	manifest := gitShow(t, gitDir, "nogit:.trace-collector/codex/manifest.json")
 	if !strings.Contains(manifest, "result.txt") || !strings.Contains(manifest, "大文件") {
 		t.Fatalf("manifest: %s", manifest)
 	}

@@ -9,38 +9,80 @@ import (
 	"strings"
 )
 
-// secretLine matches a whole trajectory line or the first 16KB of a file.
-// A match redacts that trajectory line, or keeps the file out of the commit.
-var secretLine = regexp.MustCompile(secretPattern)
+// hasSecret reports whether a trajectory line, or the first 16KB of a file,
+// contains a secret. A match redacts that trajectory line, or keeps the file
+// out of the commit. Known token shapes follow tools/.gitleaks.toml. A
+// keyword assignment counts only when the value looks like a credential.
+var knownSecret = regexp.MustCompile(knownSecretPattern)
+var keywordSecret = regexp.MustCompile(keywordSecretPattern)
 
-const secretPattern = `(?i)` +
+const knownSecretPattern = `` +
 	`-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----` +
 	`|PuTTY-User-Key-File-` +
-	`|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}` +
-	`|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}` +
-	`|glpat-[A-Za-z0-9_\-]{20,}` +
-	`|xox[baprs]-[A-Za-z0-9\-]{10,}` +
-	"|hooks\\.slack\\.com/services/T[A-Za-z0-9]+/" +
-	`|sk_(?:live|test)_[A-Za-z0-9]{10,}|rk_(?:live|test)_[A-Za-z0-9]{10,}` +
-	`|AIza[0-9A-Za-z_\-]{20,}` +
-	`|ya29\.[0-9A-Za-z_\-]+` +
-	`|sk-(?:proj-|ant-)?[A-Za-z0-9_\-]{20,}` +
-	`|hf_[A-Za-z0-9]{20,}` +
-	`|pypi-[A-Za-z0-9_\-]{20,}` +
-	`|npm_[A-Za-z0-9]{20,}` +
-	`|SG\.[A-Za-z0-9_\-]{20,}` +
-	`|eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}` +
-	"|bearer\\s+[A-Za-z0-9\\-._~+/]{16,}={0,2}" +
-	"|(?:postgres(?:ql)?|mysql|mongodb(?:\\+srv)?|redis|amqp)://[^\\s:/]+:[^\\s@]{8,}@" +
-	"|[\"']?(?:api[ _-]?key|secret[ _-]?key|access[ _-]?key|private[ _-]?key|client[ _-]?secret|auth(?:entication)?[ _-]?token|refresh[ _-]?token|session[ _-]?token|password|passwd|pwd|secret|token|credential)[\"']?\\s*[:=]\\s*[\"']?[A-Za-z0-9+/=_\\-.~]{8,}" +
-	"|(?:api[ _-]?key|secret|token|password|passwd)\\s+is\\s+[A-Za-z0-9+/=_\\-.~]{8,}" +
-	"|(?:password|passwd|pwd)\\s*(?:is\\s*|[:=]\\s*)?(?:[A-Za-z0-9+/=_\\-.~]{8,}|\\d{6,})" +
-	"|(?:访问密钥|私钥|密钥|秘钥|令牌|密码|口令|凭证|凭据)\\s*(?:是|为|[:：=])?\\s*(?:[A-Za-z0-9+/=_\\-.~]{8,}|\\d{6,})" +
-	`|\b(?:ak|sk)\b["']?\s*[:=]\s*["']?[A-Za-z0-9+/=_\-.~]{8,}` +
-	`|\bsecret[_-]?key\b["']?\s*(?:is\s*|是\s*|为\s*|[:：=]\s*)["']?(?:[A-Za-z0-9+/=_\-.~]{8,}|\d{6,})` +
-	`|\bsecret[_-]?key\b["']?\s+["']?(?:\d[A-Za-z0-9+/=_\-.~]{7,}|[A-Za-z+/=_\-.~]+\d[A-Za-z0-9+/=_\-.~]{6,}|\d{6,})` +
-	`|\bsecret key\b["']?\s*(?:is\s*|是\s*|为\s*|[:：=]\s*)["']?(?:[A-Za-z0-9+/=_\-.~]{8,}|\d{6,})` +
-	`|\bsecret key\b["']?\s+["']?(?:\d[A-Za-z0-9+/=_\-.~]{7,}|[A-Za-z+/=_\-.~]+\d[A-Za-z0-9+/=_\-.~]{6,}|\d{6,})`
+	`|(?:AKIA|ASIA|AIDA|AGPA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}` +
+	`|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b` +
+	`|\bglpat-[A-Za-z0-9_\-]{20,}\b` +
+	`|\bxox[abprs]-[A-Za-z0-9\-]{10,}\b` +
+	`|hooks\.slack\.com/services/T[A-Za-z0-9]+/` +
+	`|\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}\b` +
+	`|\bAIza[0-9A-Za-z_\-]{35}\b` +
+	`|\bya29\.[0-9A-Za-z_\-]+` +
+	`|\bsk-(?:proj-|ant-)?[A-Za-z0-9_\-]{16,}\b` +
+	`|\bhf_[A-Za-z0-9]{20,}\b` +
+	`|\bpypi-[A-Za-z0-9_\-]{20,}\b` +
+	`|\bnpm_[A-Za-z0-9]{20,}\b` +
+	`|\bshpat_[A-Za-z0-9]{20,}\b` +
+	`|\blin_api_[A-Za-z0-9]{20,}\b` +
+	`|\bkey-[0-9A-Za-z]{32}\b` +
+	`|\bSG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}\b` +
+	`|\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b` +
+	`|(?i:bearer)\s+[A-Za-z0-9\-._~+/]{16,}={0,2}` +
+	`|(?i:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp)://[^\s:/]+:[^\s@]{8,}@`
+
+const keywordValue = `([A-Za-z0-9+/=_\-.~]{8,})`
+
+const keywordSecretPattern = `(?i:` +
+	`\b(?:api[ _-]?key|secret[ _-]?key|access[ _-]?key|private[ _-]?key|client[ _-]?secret|auth(?:entication)?[ _-]?token|refresh[ _-]?token|session[ _-]?token|password|passwd|pwd|secret|token|credential)\b["']?(?:\s*(?:is|是|为)\s*|\s*[:：=]\s*|\s+)["']?` + keywordValue +
+	`|(?:访问密钥|私钥|密钥|秘钥|令牌|密码|口令|凭证|凭据)["']?(?:\s*(?:是|为)\s*|\s*[:：=]\s*|\s+)["']?` + keywordValue +
+	`|["']?\b(?:ak|sk)\b["']?\s*[:=]\s*["']?` + keywordValue +
+	`)`
+
+func hasSecret(b []byte) bool {
+	if knownSecret.Match(b) {
+		return true
+	}
+	for _, loc := range keywordSecret.FindAllSubmatchIndex(b, -1) {
+		for i := 2; i+1 < len(loc); i += 2 {
+			if loc[i] >= 0 && credentialValue(b[loc[i]:loc[i+1]]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasSecretString(s string) bool {
+	return hasSecret([]byte(s))
+}
+
+func credentialValue(v []byte) bool {
+	if len(v) >= 24 {
+		return true
+	}
+	if len(v) < 8 {
+		return false
+	}
+	var letter, digit bool
+	for _, c := range v {
+		switch {
+		case c >= '0' && c <= '9':
+			digit = true
+		case (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'):
+			letter = true
+		}
+	}
+	return letter && digit
+}
 
 var largeSuffix = map[string]bool{
 	".pt": true, ".pth": true, ".onnx": true, ".safetensors": true, ".gguf": true,
@@ -115,7 +157,7 @@ func contentSecret(path string) bool {
 	defer f.Close()
 	buf := make([]byte, 16<<10)
 	n, _ := f.Read(buf)
-	return secretLine.Match(buf[:n])
+	return hasSecret(buf[:n])
 }
 
 func scanProject(root string, maxFiles int, maxBytes int64) ([]scanned, string, error) {
@@ -137,7 +179,7 @@ func walkProject(root string, maxFiles int, maxBytes int64, readContent bool) ([
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if name == ".git" || name == ".codex-collect" {
+			if name == ".git" || name == ".codex-collect" || name == ".trace-collector" {
 				return filepath.SkipDir
 			}
 			return nil

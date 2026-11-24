@@ -67,7 +67,7 @@ func recordDetail(s string) string {
 }
 
 func redactSecrets(s string) string {
-	for _, key := range []string{"GITHUB_TOKEN", "GH_TOKEN", "CODEUP_TOKEN", "YUNXIAO_TOKEN"} {
+	for _, key := range []string{"GITHUB_TOKEN", "GH_TOKEN", "GITEE_TOKEN", "CODEUP_TOKEN", "YUNXIAO_TOKEN"} {
 		if v := strings.TrimSpace(os.Getenv(key)); len(v) >= 8 {
 			s = strings.ReplaceAll(s, v, "***")
 		}

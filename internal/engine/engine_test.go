@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,7 +63,7 @@ func TestSealUsesProjectPathWithoutCopy(t *testing.T) {
 	if got := gitShow(t, gitDir, "HEAD:.env"); strings.Contains(got, "TOKEN=secret") || !strings.Contains(got, "因密钥排除") {
 		t.Fatalf("secret leaked: %q", got)
 	}
-	manifest := gitShow(t, gitDir, "HEAD:.codex-collect/manifest.json")
+	manifest := gitShow(t, gitDir, "HEAD:.trace-collector/codex/manifest.json")
 	if !strings.Contains(manifest, "因密钥排除") || !strings.Contains(manifest, "models/w.pt") {
 		t.Fatalf("manifest: %s", manifest)
 	}
@@ -73,12 +74,12 @@ func TestSealUsesProjectPathWithoutCopy(t *testing.T) {
 		t.Fatalf("text file in models was skipped: %q", got)
 	}
 	repoDir := filepath.Dir(gitDir)
-	diskManifest, err := os.ReadFile(filepath.Join(repoDir, "manifest.json"))
+	diskManifest, err := os.ReadFile(filepath.Join(repoDir, "codex", "manifest.json"))
 	must(t, err)
 	if !strings.Contains(string(diskManifest), "models/w.pt") {
 		t.Fatalf("repo manifest: %s", diskManifest)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".codex-collect")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".trace-collector")); !os.IsNotExist(err) {
 		t.Fatal("collector wrote into the user project")
 	}
 	if _, err := os.Stat(filepath.Join(data, "staging")); !os.IsNotExist(err) {
@@ -181,17 +182,17 @@ func TestTrajectoryAndRecordsLiveUnderRepo(t *testing.T) {
 	appendRecord(data, Record{RepoKey: key, Reason: reasonIdle, Detail: "测试记录"})
 	eng.CommitAll(Config{Consent: true, PushEveryN: 10})
 
-	traj := filepath.Join(filepath.Dir(gitDir), "trajectory", "rollout.jsonl")
+	traj := filepath.Join(filepath.Dir(gitDir), "codex", "trajectory", "rollout.jsonl")
 	body, err := os.ReadFile(traj)
 	must(t, err)
 	if string(body) != "user: hello\n" {
 		t.Fatalf("trajectory file: %q", body)
 	}
 	branch := headBranch(t, gitDir)
-	if got := gitShow(t, gitDir, branch+":.codex-collect/trajectory/rollout.jsonl"); got != "user: hello\n" {
+	if got := gitShow(t, gitDir, branch+":.trace-collector/codex/trajectory/rollout.jsonl"); got != "user: hello\n" {
 		t.Fatalf("committed trajectory: %q", got)
 	}
-	if got := gitShow(t, gitDir, branch+":.codex-collect/records.jsonl"); !strings.Contains(got, "测试记录") {
+	if got := gitShow(t, gitDir, branch+":.trace-collector/codex/records.jsonl"); !strings.Contains(got, "测试记录") {
 		t.Fatalf("committed records: %q", got)
 	}
 }
@@ -229,7 +230,7 @@ func TestFindRolloutAcrossVersions(t *testing.T) {
 }
 
 func TestEffectiveDataDir(t *testing.T) {
-	base := filepath.Join(t.TempDir(), ".codex-collector")
+	base := filepath.Join(t.TempDir(), ".trace-collector")
 	if got := EffectiveDataDir(base, Config{}); got != base {
 		t.Fatalf("default = %s", got)
 	}
@@ -384,7 +385,9 @@ func readRecords(t *testing.T, data string) string {
 	t.Helper()
 	matches, _ := filepath.Glob(filepath.Join(data, "records", "*.jsonl"))
 	repoRecords, _ := filepath.Glob(filepath.Join(data, "repos", "*", "records.jsonl"))
+	nested, _ := filepath.Glob(filepath.Join(data, "repos", "*", "*", "records.jsonl"))
 	matches = append(matches, repoRecords...)
+	matches = append(matches, nested...)
 	var b strings.Builder
 	for _, m := range matches {
 		raw, _ := os.ReadFile(m)
@@ -609,6 +612,85 @@ func TestRecordDetailDropsToken(t *testing.T) {
 	if strings.Contains(body, "ghp_testtokenvalue") || !strings.Contains(body, "fatal: Authentication failed") {
 		t.Fatalf("record = %s", body)
 	}
+}
+
+func TestPushRejectedOnlyMatchesDivergedHistory(t *testing.T) {
+	rejected := errors.New("push origin nogit: exit status 1: ! [rejected] nogit -> nogit (fetch first)\nhint: Updates were rejected because the remote contains work that you do not have locally.")
+	if !pushRejected(rejected) {
+		t.Fatal("diverged push was not treated as a rejection")
+	}
+	auth := errors.New("push origin nogit: exit status 128: fatal: could not read Username for 'https://github.com': terminal prompts disabled")
+	if pushRejected(auth) {
+		t.Fatal("missing credentials was treated as a rejection")
+	}
+}
+
+func TestPushForceOverwritesDivergedRemote(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, "", "init", "--bare", remote)
+
+	local := filepath.Join(t.TempDir(), "local")
+	runGit(t, "", "init", local)
+	must(t, os.WriteFile(filepath.Join(local, "a.txt"), []byte("a\n"), 0o644))
+	runGit(t, local, "add", "a.txt")
+	runGit(t, local, "-c", "user.name=codex-collector", "-c", "user.email=collector@local", "commit", "-m", "base")
+	runGit(t, local, "branch", "-M", "nogit")
+	runGit(t, local, "remote", "add", "origin", remote)
+	runGit(t, local, "push", "-u", "origin", "nogit")
+	runGit(t, "", "--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/nogit")
+
+	other := filepath.Join(t.TempDir(), "other")
+	runGit(t, "", "clone", remote, other)
+	must(t, os.WriteFile(filepath.Join(other, "b.txt"), []byte("b\n"), 0o644))
+	runGit(t, other, "add", "b.txt")
+	runGit(t, other, "-c", "user.name=codex-collector", "-c", "user.email=collector@local", "commit", "-m", "other machine")
+	runGit(t, other, "branch", "-M", "nogit")
+	runGit(t, other, "push", "origin", "nogit")
+
+	must(t, os.WriteFile(filepath.Join(local, "c.txt"), []byte("c\n"), 0o644))
+	runGit(t, local, "add", "c.txt")
+	runGit(t, local, "-c", "user.name=codex-collector", "-c", "user.email=collector@local", "commit", "-m", "this machine")
+	localTip := strings.TrimSpace(runGit(t, local, "rev-parse", "HEAD"))
+
+	data := t.TempDir()
+	key := "repo"
+	var buf lockedBuf
+	eng := &Engine{DataDir: data, Log: &buf}
+	st := repoState{Branches: map[string]branchState{"nogit": {Commit: localTip, Unpushed: 2}}, PushFails: 4, NextPushAt: time.Now().Add(time.Hour)}
+	must(t, st.save(eng.statePath(key)))
+	eng.push(key, filepath.Join(local, ".git"), "nogit", 2)
+
+	remoteTip := strings.TrimSpace(runGit(t, "", "--git-dir", remote, "rev-parse", "refs/heads/nogit"))
+	if remoteTip != localTip {
+		t.Fatalf("remote = %s, local = %s", remoteTip, localTip)
+	}
+	got := loadState(eng.statePath(key))
+	if got.PushFails != 0 || !got.NextPushAt.IsZero() || got.Branches["nogit"].Unpushed != 0 {
+		t.Fatalf("state after force push = pushFails:%d next:%s unpushed:%d", got.PushFails, got.NextPushAt, got.Branches["nogit"].Unpushed)
+	}
+	recs := readRecords(t, data)
+	if !strings.Contains(recs, "强制覆盖") || strings.Contains(recs, "存失败") {
+		t.Fatalf("records = %s", recs)
+	}
+	if !strings.Contains(buf.String(), "推送成功 nogit") {
+		t.Fatalf("log = %q", buf.String())
+	}
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
+	}
+	return string(out)
 }
 
 func must(t *testing.T, err error) {

@@ -27,6 +27,10 @@ func main() {
 		runDaemon()
 	case "hook":
 		runHook()
+	case "claude-hook":
+		runClaudeHook()
+	case "opencode-hook":
+		runOpenCodeHook()
 	default:
 		os.Exit(0)
 	}
@@ -37,7 +41,7 @@ func configDir() string {
 		return v
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".codex-collector")
+	return filepath.Join(home, ".trace-collector")
 }
 
 func dataDir() string {
@@ -64,23 +68,7 @@ func runHook() {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return
 	}
-	withDaemonLock(func() { ensureCurrentDaemon() })
-	if err := call(body); err != nil {
-		withDaemonLock(func() {
-			owner := collectorOwnerPID()
-			info, loadErr := loadDaemonInfo()
-			if loadErr != nil || info.OwnerPid != owner || !processAlive(info.Pid) {
-				_ = startDaemon(owner)
-			}
-		})
-		deadline := time.Now().Add(3 * time.Second)
-		for time.Now().Before(deadline) {
-			if call(body) == nil {
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+	hookForward(body)
 }
 
 type daemonInfo struct {

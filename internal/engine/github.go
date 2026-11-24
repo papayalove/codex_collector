@@ -33,18 +33,30 @@ func githubToken() string {
 // for this command only puts the token in the request. The saved remote and
 // other GitHub accounts on the machine are left unchanged.
 func gitAuthArgs(remote string) []string {
-	if _, ok := githubOwner(remote); !ok {
-		return nil
+	if _, ok := githubOwner(remote); ok {
+		token := githubToken()
+		if token == "" {
+			return nil
+		}
+		user := url.UserPassword("x-access-token", token).String()
+		return []string{
+			"-c", "credential.helper=",
+			"-c", "url.https://" + user + "@github.com/.insteadOf=https://github.com/",
+		}
 	}
-	token := githubToken()
-	if token == "" {
-		return nil
+	if host, path, ok := splitGitNamespace(remote); ok && isGiteeHost(host) && len(splitPath(path)) > 0 {
+		token := giteeToken()
+		if token == "" {
+			return nil
+		}
+		// Gitee accepts the private token as both the username and the password.
+		user := url.UserPassword(token, token).String()
+		return []string{
+			"-c", "credential.helper=",
+			"-c", "url.https://" + user + "@" + host + "/.insteadOf=https://" + host + "/",
+		}
 	}
-	user := url.UserPassword("x-access-token", token).String()
-	return []string{
-		"-c", "credential.helper=",
-		"-c", "url.https://" + user + "@github.com/.insteadOf=https://github.com/",
-	}
+	return nil
 }
 
 func githubOwner(namespace string) (string, bool) {

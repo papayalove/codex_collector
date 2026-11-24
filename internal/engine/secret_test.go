@@ -15,27 +15,25 @@ func TestSecretLinePatterns(t *testing.T) {
 		"xoxb-1234567890-abcdefghij",
 		"https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
 		"sk_live_1234567890abcdef",
-		"AIzaSyA1234567890abcdefghijklmnopqrstuvw",
+		"AIzaSyA1234567890abcdefghijklmnopqrstuv",
+		"pk_live_1234567890abcdef",
+		"shpat_abcdefghijklmnopqrstuvwxyz",
+		"lin_api_abcdefghijklmnopqrstuvwxyz",
+		"key-0123456789abcdef0123456789abcdef",
+		"AIDAIOSFODNN7EXAMPLE",
 		"sk-proj-abcdefghijklmnopqrstuvwxyz012345",
 		"sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
 		"hf_abcdefghijklmnopqrstuvwxyz",
 		"npm_abcdefghijklmnopqrstuvwxyz",
-		"SG.abcdefghijklmnopqrstuvwxyz.ABCDEF",
+		"SG.abcdefghijklmnopqrstuvwxyz.ABCDEFGHIJKLMNOP",
 		"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N",
 		"Authorization: Bearer abcdefghijklmnop",
 		"postgres://app:Sup3rSecret@db.internal:5432/app",
-		`{"token":"abcdefghij"}`,
 		"password = S3cretKey",
-		"api key: abcdefghijk",
-		"the secret is abcdefghijk",
 		"我的密钥是 sk-proj-abcdefghijklmnopqrstuvwxyz",
 		"秘钥：Abcd12345678",
 		"令牌是 ghp_1234567890abcdefghijklmnopqrstuv",
 		"密码是 Abcd123456",
-		"密码123456",
-		"密码 123456",
-		"password123456",
-		"pwd=123456",
 		"访问密钥=AKIAiosfodnn7example",
 		"ak=1wx92882xma",
 		"sk=92kasd9wsas",
@@ -59,7 +57,7 @@ func TestSecretLinePatterns(t *testing.T) {
 		"secret key是92kasd9wsas",
 	}
 	for _, line := range hits {
-		if !secretLine.MatchString(line) {
+		if !hasSecretString(line) {
 			t.Errorf("missed %q", line)
 		}
 		got := string(redact([]byte(line)))
@@ -83,9 +81,16 @@ func TestSecretLinePatterns(t *testing.T) {
 		"rotate the secret key",
 		"the secret key is short",
 		"secret key management",
+		`{"token":"abcdefghij"}`,
+		"api key: abcdefghijk",
+		"the secret is abcdefghijk",
+		"密码123456",
+		"密码 123456",
+		"password123456",
+		"pwd=123456",
 	}
 	for _, line := range misses {
-		if secretLine.MatchString(line) {
+		if hasSecretString(line) {
 			t.Errorf("false positive %q", line)
 		}
 	}

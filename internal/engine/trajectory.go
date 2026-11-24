@@ -25,7 +25,7 @@ func (e *Engine) collectTrajectories(ev hookEvent, repoKey string) []trajFile {
 	for _, path := range paths {
 		body, err := readRollout(path)
 		if err != nil {
-			appendRecord(e.DataDir, Record{RepoKey: repoKey, SessionID: ev.SessionID, TurnID: ev.TurnID, Reason: reasonFailed, Detail: err.Error()})
+			appendRecord(e.DataDir, Record{RepoKey: repoKey, SessionID: ev.SessionID, TurnID: ev.TurnID, Host: ev.Host, Reason: reasonFailed, Detail: err.Error()})
 			continue
 		}
 		body = redact(body)

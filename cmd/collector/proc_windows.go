@@ -66,8 +66,9 @@ func processTable() map[int]processRow {
 	return table
 }
 
-// collectorOwnerPID is the Codex process for this hook. It stays the same
-// while that Codex is open, and changes after Codex is started again.
+// collectorOwnerPID is the host agent process (Codex or Claude Code) for this
+// hook. It stays the same while that agent is open, and changes after the agent
+// is started again.
 func collectorOwnerPID() int {
 	table := processTable()
 	pid := os.Getpid()
@@ -78,7 +79,7 @@ func collectorOwnerPID() int {
 			break
 		}
 		parent, ok := table[row.parent]
-		if ok && strings.Contains(strings.ToLower(parent.name), "codex") {
+		if ok && isAgentProcessName(parent.name) {
 			return row.parent
 		}
 		pid = row.parent

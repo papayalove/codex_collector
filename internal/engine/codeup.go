@@ -137,8 +137,16 @@ func (c codeupClient) do(method, path string, body any) (*http.Response, error) 
 }
 
 func ensureRemoteProject(namespace, name string) error {
+	namespace = canonicalNamespace(namespace)
 	if owner, ok := githubOwner(namespace); ok {
 		return ensureGitHubRepo(githubClient{Token: githubToken()}, owner, name)
+	}
+	if spec, ok := giteeFromNamespace(namespace); ok {
+		if spec.Community {
+			return ensureGiteeRepo(giteeClient{Token: giteeToken()}, spec.Owner, name)
+		}
+		api := "https://" + spec.Host + "/api/v8"
+		return ensureGiteeEnterpriseRepo(giteeClient{API: api, Token: giteeToken()}, spec, name)
 	}
 	if spec, ok := codeupFromNamespace(namespace); ok {
 		return ensureCodeupRepo(codeupClient{Token: codeupToken()}, spec, name)

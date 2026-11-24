@@ -2,8 +2,8 @@
 name: install-codex-collector
 description: >-
   在本机安装 Codex 采集插件：缺少 Git 或 Codex 命令行时由代理先装上，再固定插件目录、
-  注册本地 marketplace、按 config.example.json 写入用户配置，并设置 GITHUB_TOKEN。
-  用户要求安装、重装或配置采集插件、codex-collector、GitHub 令牌时使用。
+  注册本地 marketplace、按 config.example.json 写入用户配置，并设置 GITEE_TOKEN。
+  用户要求安装、重装或配置采集插件、codex-collector、Gitee 令牌时使用。
 ---
 
 # 安装 Codex 采集插件
@@ -16,7 +16,7 @@ description: >-
 
 1. 使用者邮箱。只写入对方这次的回答。
 2. 企业采集空间地址。`config.example.json` 里的 `enterpriseNamespace` 仍含「公司Git地址」这类占位，或为空时，必须问。
-3. GitHub 令牌。用户环境或 shell 配置里已经有字面量 `GITHUB_TOKEN` 时不要覆盖，除非使用者明确要求更换。
+3. Gitee 私人令牌。用户环境或 shell 配置里已经有字面量 `GITEE_TOKEN` 时不要覆盖，除非使用者明确要求更换。
 4. 插件目录。当前目录同时有 `.codex-plugin/plugin.json`、`bin/`、`config.example.json` 时，就用当前目录。否则问一个以后不再移动的路径。Windows 可建议 `D:\tools\codex_collector`，Linux 和 Mac 可建议 `~/tools/codex_collector`。
 
 只有使用者说系统盘空间不够时，再问 `dataDir`。已有采集仓库不会自动搬走。
@@ -56,25 +56,27 @@ codex plugin add codex-collector@codex-collector-local
 
 ## 配置
 
-1. 建立用户目录下的 `.codex-collector`。
+1. 建立用户目录下的 `.trace-collector`。
 2. 还没有 `config.json` 时，把插件根目录的 `config.example.json` 复制过去并改名。已经有配置时，只改使用者这次明确要求的字段。
 3. 用 JSON 解析后写入 `email` 和 `enterpriseNamespace`，保留其余字段。不要按 README 里的示例 JSON 重写整份文件。
-4. 只有使用者要求换数据盘时才增加 `dataDir`。Windows 写成 `D:/codex-collector` 这种正斜杠路径。Linux 和 Mac 例如 `/data/codex-collector`。
+4. 只有使用者要求换数据盘时才增加 `dataDir`。Windows 写成 `D:/trace-collector` 这种正斜杠路径。Linux 和 Mac 例如 `/data/trace-collector`。
 
 配置文件位置：
 
-- Windows：`%USERPROFILE%\.codex-collector\config.json`
-- Linux 和 Mac：`~/.codex-collector/config.json`
+- Windows：`%USERPROFILE%\.trace-collector\config.json`
+- Linux 和 Mac：`~/.trace-collector/config.json`
 
 ## 令牌
 
-先检查是否已经设置，检查时不要打印令牌的值。
+先检查是否已经设置，检查时不要打印令牌的值。采集仓库在 Gitee 上，使用 `GITEE_TOKEN`。私人令牌勾选 Git http push 和代码库。
 
-- Windows：看用户级环境变量 `GITHUB_TOKEN`。没有则在 PowerShell 执行 `setx GITHUB_TOKEN "令牌"`。
-- Linux：`~/.bashrc` 里没有字面量 `export GITHUB_TOKEN="..."` 时，追加这一行。已有就不要再追加。
+- Windows：看用户级环境变量 `GITEE_TOKEN`。没有则在 PowerShell 执行 `setx GITEE_TOKEN "私人令牌"`。`setx` 不会改已经打开的窗口，装完后要新开终端，并完全退出 Codex 再打开。
+- Linux：`~/.bashrc` 里没有字面量 `export GITEE_TOKEN="私人令牌"` 时，追加这一行。已有就不要再追加。
 - Mac：按同样规则写入 `~/.zshrc`。
 
-`export GITHUB_TOKEN=$OTHER` 这种间接赋值不算已设置。
+`enterpriseNamespace` 写成 `https://gitee.com/组织名`，或企业版仓库组页面（例如 `https://gitee.pjlab.org.cn/L2/_source/groups/L2/agent-trace/trace-collector-repos/repos/`）。
+
+`export GITEE_TOKEN=$OTHER` 这种间接赋值不算已设置。
 
 ## 交给使用者完成
 

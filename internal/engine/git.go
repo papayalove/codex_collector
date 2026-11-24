@@ -137,6 +137,49 @@ func (g gitRunner) revParse(gitDir, rev string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+type treeItem struct {
+	Mode string
+	SHA  string
+	Path string
+}
+
+func (g gitRunner) listTree(gitDir, rev string) ([]treeItem, error) {
+	out, err := g.run(gitDir, nil, "ls-tree", "-r", "-z", rev)
+	if err != nil {
+		return nil, err
+	}
+	var items []treeItem
+	rest := []byte(out)
+	for len(rest) > 0 {
+		rec, next, ok := bytes.Cut(rest, []byte{0})
+		rest = next
+		if len(rec) == 0 {
+			if !ok {
+				break
+			}
+			continue
+		}
+		tab := bytes.IndexByte(rec, '\t')
+		if tab < 0 {
+			continue
+		}
+		meta := strings.Fields(string(rec[:tab]))
+		if len(meta) < 3 {
+			continue
+		}
+		items = append(items, treeItem{Mode: meta[0], SHA: meta[2], Path: string(rec[tab+1:])})
+	}
+	return items, nil
+}
+
+func (g gitRunner) treeFromEntries(gitDir, indexPath string, entries []treeItem) (string, error) {
+	var info []byte
+	for _, ent := range entries {
+		info = append(info, indexInfo(ent.Mode, ent.SHA, ent.Path)...)
+	}
+	return g.writeTree(gitDir, indexPath, info)
+}
+
 func (g gitRunner) treeWithFile(gitDir, parentTree, indexPath, path string, content []byte) (string, error) {
 	sha, err := g.hashStdin(gitDir, content)
 	if err != nil {

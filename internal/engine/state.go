@@ -108,6 +108,7 @@ type Job struct {
 	TurnIDs   []string `json:"turnIds"`
 	SessionID string   `json:"sessionId"`
 	UserHead  string   `json:"userHead"`
+	Host      string   `json:"host,omitempty"`
 }
 
 type Record struct {
@@ -115,6 +116,7 @@ type Record struct {
 	RepoKey   string `json:"repoKey"`
 	SessionID string `json:"sessionId,omitempty"`
 	TurnID    string `json:"turnId,omitempty"`
+	Host      string `json:"host,omitempty"`
 	Reason    string `json:"reason"`
 	Detail    string `json:"detail,omitempty"`
 	Bytes     int64  `json:"bytes,omitempty"`
@@ -220,7 +222,7 @@ func appendRecord(dataDir string, rec Record) {
 	rec.Detail = recordDetail(rec.Detail)
 	var path string
 	if rec.RepoKey != "" {
-		dir := filepath.Join(dataDir, "repos", rec.RepoKey)
+		dir := filepath.Join(dataDir, "repos", rec.RepoKey, hostLabel(rec.Host))
 		_ = os.MkdirAll(dir, 0o755)
 		path = filepath.Join(dir, "records.jsonl")
 	} else {
@@ -255,7 +257,7 @@ func parseCountObjects(out string) int64 {
 }
 
 func remoteURL(namespace, key string) string {
-	return strings.TrimRight(namespace, "/") + "/" + key + ".git"
+	return strings.TrimRight(canonicalNamespace(namespace), "/") + "/" + key + ".git"
 }
 
 func (e *Engine) ensureEnterpriseRepo(cfg Config, gitDir, key string) error {
@@ -281,7 +283,7 @@ func (e *Engine) ensureRemoteLater(cfg Config, gitDir, key string) {
 		appendRecord(e.DataDir, Record{Time: e.now().Format(time.RFC3339), RepoKey: key, Reason: reasonFailed, Detail: err.Error()})
 		return
 	}
-	e.record(key, "", "", reasonRemote, url)
+	e.record(key, "", "", "", reasonRemote, url)
 }
 
 func (e *Engine) ensureOrigin(gitDir, url string) error {

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var shellTokenKeys = []string{"GITHUB_TOKEN", "GH_TOKEN", "CODEUP_TOKEN", "YUNXIAO_TOKEN"}
+var shellTokenKeys = []string{"GITHUB_TOKEN", "GH_TOKEN", "GITEE_TOKEN", "CODEUP_TOKEN", "YUNXIAO_TOKEN"}
 
 func daemonEnviron() []string {
 	env := os.Environ()
