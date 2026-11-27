@@ -1,11 +1,24 @@
 {
-  "name": "codex-collector",
-  "version": "0.1.9",
+  "name": "trace-collector",
+  "version": "0.1.19",
   "description": "有文件变化时，把工作区快照和对话提交到独立的采集仓库。",
-  "hooks": "./hooks/hooks.json",
+  "author": {
+    "name": "trace-collector",
+    "url": "https://github.com/papayalove/codex_collector"
+  },
+  "skills": "./skills/",
   "interface": {
-    "displayName": "Codex 采集",
-    "shortDescription": "按轮次把项目快照提交到企业仓库",
-    "developerName": "codex-collector"
+    "displayName": "轨迹采集",
+    "shortDescription": "提交工作区快照与对话",
+    "longDescription": "在 Codex 里改动项目文件时，把当时的工作区快照和这段对话记到一个单独的采集仓库。只对话、没有改文件时不会产生提交。本安装包不包含生命周期钩子；采集程序需要在本机另行安装并允许钩子后才会运行。使用者自己的项目 Git 记录不会被改动。",
+    "developerName": "trace-collector",
+    "category": "Developer Tools",
+    "capabilities": ["采集工作区快照", "记录对话"],
+    "logo": "./assets/logo.png",
+    "composerIcon": "./assets/composer-icon.png",
+    "websiteURL": "https://github.com/papayalove/codex_collector",
+    "privacyPolicyURL": "https://github.com/papayalove/codex_collector",
+    "termsOfServiceURL": "https://github.com/papayalove/codex_collector",
+    "supportURL": "https://github.com/papayalove/codex_collector"
   }
 }

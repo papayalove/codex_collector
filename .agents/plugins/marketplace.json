@@ -1,11 +1,11 @@
 {
-  "name": "codex-collector-local",
+  "name": "trace-collector",
   "interface": {
-    "displayName": "本地采集插件"
+    "displayName": "轨迹采集"
   },
   "plugins": [
     {
-      "name": "codex-collector",
+      "name": "trace-collector",
       "source": {
         "source": "local",
         "path": "./"
