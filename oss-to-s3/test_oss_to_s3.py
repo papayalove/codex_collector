@@ -60,7 +60,9 @@ class OssToS3Test(unittest.TestCase):
         argv = oss_to_s3.build_argv(cfg, Path("C:/tmp/rclone.conf"))
         self.assertIn("--no-check-certificate", argv)
         text = oss_to_s3.render_rclone_conf(cfg)
-        self.assertIn("force_path_style = true", text.split("[s3]", 1)[1])
+        s3 = text.split("[s3]", 1)[1]
+        self.assertIn("provider = Ceph", s3)
+        self.assertIn("force_path_style = true", s3)
         self.assertIn("--config", argv)
         shown = oss_to_s3.public_argv(argv)
         self.assertNotIn("oss secret", shown)

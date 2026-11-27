@@ -147,12 +147,19 @@ def render_rclone_conf(cfg: dict[str, Any]) -> str:
         ("acl", "private"),
     ]
     provider = _optional(s3, "provider", "AWS") or "AWS"
+    # AWS provider forces virtual-host URLs and ignores force_path_style.
+    # A custom endpoint such as Ceph must use provider Ceph to keep path-style.
+    if endpoint_host(_optional(s3, "endpoint")) and provider.upper() == "AWS":
+        provider = "Ceph"
+    region = _optional(s3, "region")
+    if not region and endpoint_host(_optional(s3, "endpoint")):
+        region = "us-east-1"
     s3_fields = [
         ("provider", provider),
         ("env_auth", "false"),
         ("access_key_id", s3["accessKeyId"].strip()),
         ("secret_access_key", s3["secretAccessKey"].strip()),
-        ("region", _optional(s3, "region")),
+        ("region", region),
         ("endpoint", endpoint_host(_optional(s3, "endpoint"))),
         ("acl", "private"),
     ]
