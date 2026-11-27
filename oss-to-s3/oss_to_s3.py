@@ -156,7 +156,8 @@ def render_rclone_conf(cfg: dict[str, Any]) -> str:
         ("endpoint", endpoint_host(_optional(s3, "endpoint"))),
         ("acl", "private"),
     ]
-    if s3.get("forcePathStyle") is True:
+    custom_endpoint = endpoint_host(_optional(s3, "endpoint")) != ""
+    if s3.get("forcePathStyle") is True or custom_endpoint:
         s3_fields.append(("force_path_style", "true"))
     lines = _remote_lines("oss", oss_fields) + [""] + _remote_lines("s3", s3_fields) + [""]
     return "\n".join(lines)
@@ -221,6 +222,8 @@ def build_argv(cfg: dict[str, Any], rclone_config: Path) -> list[str]:
         argv.append("--size-only")
     elif compare == "checksum":
         argv.append("--checksum")
+    if endpoint_host(_optional(cfg["s3"], "endpoint")):
+        argv.append("--no-check-certificate")
     if cfg.get("dryRun") is True:
         argv.append("--dry-run")
     return argv

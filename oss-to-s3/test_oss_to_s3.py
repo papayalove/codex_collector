@@ -55,6 +55,12 @@ class OssToS3Test(unittest.TestCase):
         self.assertEqual(argv[3], "s3:dst-bucket/incoming/")
         self.assertIn("--size-only", argv)
         self.assertIn("--dry-run", argv)
+        self.assertNotIn("--no-check-certificate", argv)
+        cfg["s3"]["endpoint"] = "ceph.example.com"
+        argv = oss_to_s3.build_argv(cfg, Path("C:/tmp/rclone.conf"))
+        self.assertIn("--no-check-certificate", argv)
+        text = oss_to_s3.render_rclone_conf(cfg)
+        self.assertIn("force_path_style = true", text.split("[s3]", 1)[1])
         self.assertIn("--config", argv)
         shown = oss_to_s3.public_argv(argv)
         self.assertNotIn("oss secret", shown)
