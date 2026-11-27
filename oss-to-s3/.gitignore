@@ -1,0 +1,5 @@
+config.json
+run-task.cmd
+logs/
+.run/
+__pycache__/

@@ -1,1 +1,6 @@
 docs/
+oss-to-s3/config.json
+oss-to-s3/logs/
+oss-to-s3/.run/
+oss-to-s3/run-task.cmd
+oss-to-s3/**/__pycache__/

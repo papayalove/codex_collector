@@ -1,0 +1,27 @@
+{
+  "intervalMinutes": 60,
+  "mode": "copy",
+  "compare": "size",
+  "transfers": 8,
+  "checkers": 8,
+  "dryRun": false,
+  "rclonePath": "rclone",
+  "oss": {
+    "accessKeyId": "",
+    "accessKeySecret": "",
+    "endpoint": "oss-cn-hangzhou.aliyuncs.com",
+    "region": "cn-hangzhou",
+    "bucket": "",
+    "prefix": ""
+  },
+  "s3": {
+    "provider": "AWS",
+    "accessKeyId": "",
+    "secretAccessKey": "",
+    "region": "",
+    "endpoint": "",
+    "bucket": "",
+    "prefix": "",
+    "forcePathStyle": true
+  }
+}
